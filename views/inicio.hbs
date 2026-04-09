@@ -1,0 +1,175 @@
+<!-- ================================================================
+  PÁGINA: INICIO  (views/inicio.hbs)
+================================================================ -->
+
+<!-- HERO ─────────────────────────────────────────────────────────
+  IMAGEN DE FONDO: Cambia la imagen en public/css/variables.css
+  buscando la variable --hero-bg-inicio, o en public/images/
+  Tamaño recomendado: 1920 x 900px
+────────────────────────────────────────────────────────────────── -->
+<section class="hero hero-inicio">
+  <!-- Si prefieres usar una etiqueta img en lugar de CSS background:-->
+  <div class="hero-overlay"></div>
+
+  <div class="hero-content fade-in">
+    <span class="hero-eyebrow">Bienvenido a</span>
+    <h1 class="hero-title">Hoteles <em>Rio</em></h1>
+    <div class="hero-divider"></div>
+
+    <p class="hero-tagline">La experiencia de lujo que merece</p>
+
+    <div class="hero-actions">
+      <a href="/reservas" class="btn btn-gold">Reservar ahora</a>
+      <a href="/habitaciones" class="btn btn-outline-white">Ver habitaciones</a>
+    </div>
+  </div>
+
+  <div class="scroll-down">
+    <svg viewBox="0 0 24 24">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  </div>
+</section>
+
+
+<!-- ESENCIA ──────────────────────────────────────────────────────
+  IMAGEN DERECHA: Coloca tu foto en public/images/esencia.jpg
+  Tamaño recomendado: 700 x 500px
+────────────────────────────────────────────────────────────────── -->
+<section class="esencia">
+  <div class="section-container grid-2">
+
+    <div class="esencia-texto slide-up">
+      <span class="section-label">Nuestra Esencia</span>
+      <h2 class="section-heading">Un refugio de<br><em>elegancia</em> y confort</h2>
+      <!-- DESCRIPCIÓN del hotel — edita el texto -->
+      <p>En Hoteles Rio, cada detalle ha sido concebido para ofrecerle una experiencia que trasciende la simple estadía. Nuestros espacios combinan la calidez del diseño contemporáneo con la serenidad que todo viajero merece.</p>
+      <p>Ubicados sobre la Panamericana Norte, somos el punto de encuentro entre la comodidad moderna y el servicio personalizado de excelencia.</p>
+
+      <!-- ESTADÍSTICAS — Edita los números y etiquetas -->
+      <div class="stats-row">
+        <div class="stat">
+          <span class="stat-num">03</span>
+          <span class="stat-label">Tipos de habitación</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num">24h</span>
+          <span class="stat-label">Servicio disponible</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num">★★★★</span>
+          <span class="stat-label">Calidad garantizada</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="esencia-imagen slide-up" style="animation-delay:0.2s">
+      <!-- IMAGEN ESENCIA — Reemplaza con tu foto -->
+      <div class="img-wrapper">
+        <img src="/images/esencia.png"
+             alt="Interior de Hoteles Rio"
+             class="img-reveal"
+             onerror="this.parentElement.classList.add('img-placeholder')">
+        <div class="img-accent-border"></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- HABITACIONES PREVIEW ─────────────────────────────────────── -->
+<section class="hab-preview">
+  <div class="section-container">
+    <div class="section-header">
+      <span class="section-label">Nuestros Espacios</span>
+      <h2 class="section-heading">Habitaciones</h2>
+      <p class="section-sub">Espacios diseñados para su bienestar</p>
+    </div>
+
+    <div class="rooms-grid">
+      {{#each habitaciones}}
+      <article class="room-card slide-up">
+        <a href="/habitaciones/{{slug}}" class="room-card-link">
+          <div class="room-img-wrap">
+            <!-- IMAGEN HABITACIÓN — Lee el comentario en server.js para saber dónde colocar las fotos -->
+            <img src="{{imagen}}"
+                 alt="{{imagenAlt}}"
+                 loading="lazy"
+                 onerror="this.parentElement.classList.add('img-placeholder'); this.style.display='none'">
+            {{#if badge}}<span class="room-badge">{{badge}}</span>{{/if}}
+          </div>
+          <div class="room-card-body">
+            <span class="room-tier">{{categoria}}</span>
+            <h3 class="room-name">{{nombre}}</h3>
+            <p class="room-desc">{{descripcionCorta}}</p>
+            <div class="room-amenidades-mini">
+              {{#each amenidades}}
+                {{#if @first}}<span>{{this}}</span>{{/if}}
+              {{/each}}
+              {{#if amenidades.[1]}}<span>{{amenidades.[1]}}</span>{{/if}}
+              {{#if amenidades.[2]}}<span>{{amenidades.[2]}}</span>{{/if}}
+            </div>
+          </div>
+          <div class="room-card-footer">
+            <div class="room-price">
+              Desde S/. {{precio}} <small>/ noche</small>
+            </div>
+            <span class="btn btn-dark-sm">Ver detalles</span>
+          </div>
+        </a>
+      </article>
+      {{/each}}
+    </div>
+
+    <div class="section-cta">
+      <a href="/habitaciones" class="btn btn-outline-dark">Ver todas las habitaciones</a>
+    </div>
+  </div>
+</section>
+
+
+<!-- BANNER CTA ───────────────────────────────────────────────────
+  IMAGEN DE FONDO: Coloca en public/images/banner-cta.jpg (1920x400px)
+────────────────────────────────────────────────────────────────── -->
+<section class="banner-cta">
+  <div class="banner-cta-overlay"></div>
+  <div class="banner-cta-content">
+    <h2>¿Listo para su estadía?</h2>
+    <p>Reserve ahora y viva la experiencia Hoteles Rio</p>
+    <a href="/reservas" class="btn btn-gold">Hacer una reserva</a>
+  </div>
+</section>
+
+
+<!-- CONTACTO RÁPIDO ──────────────────────────────────────────── -->
+<section class="contacto-rapido">
+  <div class="section-container">
+    <div class="contact-cards">
+      <div class="contact-card">
+        <div class="contact-card-icon">
+          <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <!-- DIRECCIÓN — Edita aquí -->
+        <h4>Ubicación</h4>
+        <p>Panamericana Norte<br>N° 5568 Cdra 5</p>
+      </div>
+      <div class="contact-card">
+        <div class="contact-card-icon">
+          <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.7a16 16 0 0 0 6 6l.91-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.6 15z"/></svg>
+        </div>
+        <!-- TELÉFONO — Edita aquí -->
+        <h4>Teléfono</h4>
+        <p><a href="tel:+51999999999">+51 999-999-999</a></p>
+      </div>
+      <div class="contact-card">
+        <div class="contact-card-icon">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </div>
+        <!-- EMAIL — Edita aquí -->
+        <h4>Correo</h4>
+        <p><a href="mailto:info@hotelrio.com">info@hotelrio.com</a></p>
+      </div>
+    </div>
+  </div>
+</section>

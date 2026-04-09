@@ -1,0 +1,81 @@
+<!-- ================================================================
+  PÁGINA: GALERÍA  (views/galeria.hbs)
+  FOTOS: Coloca tus imágenes en public/images/gallery/
+  Edita el array "fotos" en server.js para agregar/quitar fotos
+================================================================ -->
+
+<section class="hero hero-interior hero-galeria">
+  <div class="hero-overlay"></div>
+  <div class="hero-content hero-content-left fade-in">
+    <span class="hero-eyebrow">Nuestros Espacios</span>
+    <h1 class="hero-title">Galería</h1>
+    <p class="hero-tagline">Descubra la belleza de nuestras instalaciones</p>
+  </div>
+  <nav class="breadcrumb">
+    <a href="/">Inicio</a> <span>/</span> <span>Galería</span>
+  </nav>
+</section>
+
+<section class="galeria-section">
+  <div class="section-container">
+
+    <!-- Filtros por categoría -->
+    <div class="galeria-filtros">
+      {{#each categorias}}
+      <button class="filtro-btn {{#if @first}}active{{/if}}" data-cat="{{this}}">{{this}}</button>
+      {{/each}}
+    </div>
+
+    <!-- Grid de fotos -->
+    <div class="galeria-grid" id="galeriaGrid">
+      {{#each fotos}}
+      <div class="galeria-item" data-cat="{{categoria}}">
+        <!-- ============================================================
+          FOTO {{@index}} — Reemplaza en public/images/gallery/
+          Tamaño recomendado: 800 x 600px
+          Alt: "{{alt}}" | Categoría: "{{categoria}}"
+        ============================================================ -->
+        <div class="galeria-img-wrapper">
+          <img src="{{src}}"
+               alt="{{alt}}"
+               loading="lazy"
+               onerror="this.parentElement.parentElement.classList.add('img-placeholder-gallery')">
+          <div class="galeria-overlay">
+            <div class="galeria-overlay-content">
+              <svg viewBox="0 0 24 24" class="zoom-icon"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+              <span>{{alt}}</span>
+            </div>
+          </div>
+        </div>
+        <span class="galeria-cat-tag">{{categoria}}</span>
+      </div>
+      {{/each}}
+    </div>
+
+    <!-- Mensaje si no hay fotos aún -->
+    <div class="galeria-vacia" id="galeriaVacia" style="display:none">
+      <p>No hay fotos en esta categoría aún.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" aria-hidden="true">
+  <button class="lightbox-close" id="lightboxClose" aria-label="Cerrar">
+    <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+  <button class="lightbox-prev" id="lightboxPrev" aria-label="Anterior">
+    <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <div class="lightbox-content">
+    <img src="" alt="" id="lightboxImg">
+    <p id="lightboxCaption"></p>
+  </div>
+  <button class="lightbox-next" id="lightboxNext" aria-label="Siguiente">
+    <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+</div>
+<div class="lightbox-bg" id="lightboxBg"></div>
+
+<script src="/js/galeria.js"></script>

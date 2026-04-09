@@ -1,0 +1,82 @@
+<!-- ================================================================
+  PÁGINA: HABITACIONES  (views/habitaciones.hbs)
+================================================================ -->
+
+<!-- HERO HABITACIONES ────────────────────────────────────────────
+  IMAGEN: Coloca tu foto en public/images/hero-habitaciones.jpg
+  Tamaño recomendado: 1920 x 500px
+────────────────────────────────────────────────────────────────── -->
+<section class="hero hero-interior hero-habitaciones">
+  <div class="hero-overlay"></div>
+  <div class="hero-content hero-content-left fade-in">
+    <span class="hero-eyebrow">Nuestros Espacios</span>
+    <h1 class="hero-title">Habitaciones</h1>
+    <p class="hero-tagline">Diseñadas para su bienestar y descanso</p>
+  </div>
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Inicio</a> <span>/</span> <span>Habitaciones</span>
+  </nav>
+</section>
+
+
+<!-- LISTADO ──────────────────────────────────────────────────── -->
+<section class="habitaciones-list">
+  <div class="section-container">
+
+    {{#each habitaciones}}
+    <article class="hab-item {{#if @even}}hab-item-reverse{{/if}} slide-up">
+
+      <div class="hab-item-imagen">
+        <!-- IMAGEN: Coloca foto en public/images/rooms/{{slug}}.jpg -->
+        <div class="img-wrapper hab-img-wrapper">
+          <img src="{{imagen}}"
+               alt="{{imagenAlt}}"
+               loading="lazy"
+               onerror="this.parentElement.classList.add('img-placeholder'); this.style.display='none'">
+          {{#if badge}}<span class="room-badge">{{badge}}</span>{{/if}}
+        </div>
+      </div>
+
+      <div class="hab-item-info">
+        <span class="section-label">{{categoria}}</span>
+        <h2 class="hab-item-titulo">{{nombre}}</h2>
+        <p class="hab-item-desc">{{descripcionLarga}}</p>
+
+        <ul class="amenidades-lista">
+          {{#each amenidades}}
+          <li>
+            <svg viewBox="0 0 24 24" class="check-icon"><polyline points="20 6 9 17 4 12"/></svg>
+            {{this}}
+          </li>
+          {{/each}}
+        </ul>
+
+        <div class="hab-item-meta">
+          <div class="meta-item">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>{{capacidad}}</span>
+          </div>
+          <div class="meta-item">
+            <svg viewBox="0 0 24 24"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>
+            <span>{{camas}}</span>
+          </div>
+        </div>
+
+        <div class="hab-item-footer">
+          <div class="hab-precio">
+            <span class="precio-desde">Desde</span>
+            <span class="precio-num">S/. {{precio}}</span>
+            <span class="precio-noche">/ noche</span>
+          </div>
+          <div class="hab-item-btns">
+            <a href="/habitaciones/{{slug}}" class="btn btn-outline-dark">Ver detalles</a>
+            <a href="/reservas?habitacion={{nombre}}" class="btn btn-gold">Reservar</a>
+          </div>
+        </div>
+      </div>
+
+    </article>
+    {{/each}}
+
+  </div>
+</section>

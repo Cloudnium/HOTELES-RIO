@@ -1,0 +1,123 @@
+<!-- ================================================================
+  PÁGINA: DETALLE HABITACIÓN  (views/habitacion-detalle.hbs)
+================================================================ -->
+
+<section class="hero hero-interior hero-hab-detalle">
+  <div class="hero-overlay"></div>
+  <!-- IMAGEN HERO: Se carga automáticamente desde la imagen de la habitación -->
+  <img src="{{hab.imagen}}" alt="{{hab.imagenAlt}}" class="hero-bg-img-tag"
+       onerror="this.style.display='none'">
+  <div class="hero-content hero-content-left fade-in">
+    <span class="hero-eyebrow">{{hab.categoria}}</span>
+    <h1 class="hero-title">{{hab.nombre}}</h1>
+  </div>
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="/">Inicio</a> <span>/</span>
+    <a href="/habitaciones">Habitaciones</a> <span>/</span>
+    <span>{{hab.nombre}}</span>
+  </nav>
+</section>
+
+<section class="hab-detalle">
+  <div class="section-container">
+    <div class="grid-2 hab-detalle-grid">
+
+      <!-- Columna info -->
+      <div class="hab-detalle-info slide-up">
+        {{#if hab.badge}}
+        <span class="badge-destacado">{{hab.badge}}</span>
+        {{/if}}
+        <h2 class="hab-detalle-titulo">{{hab.nombre}}</h2>
+        <p class="hab-detalle-desc">{{hab.descripcionLarga}}</p>
+
+        <div class="hab-detalle-meta">
+          <div class="meta-bloque">
+            <span class="meta-icono">👥</span>
+            <div>
+              <span class="meta-titulo">Capacidad</span>
+              <span class="meta-valor">{{hab.capacidad}}</span>
+            </div>
+          </div>
+          <div class="meta-bloque">
+            <span class="meta-icono">🛏</span>
+            <div>
+              <span class="meta-titulo">Camas</span>
+              <span class="meta-valor">{{hab.camas}}</span>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="amenidades-titulo">Amenidades incluidas</h3>
+        <ul class="amenidades-grid">
+          {{#each hab.amenidades}}
+          <li>
+            <svg viewBox="0 0 24 24" class="check-icon"><polyline points="20 6 9 17 4 12"/></svg>
+            {{this}}
+          </li>
+          {{/each}}
+        </ul>
+      </div>
+
+      <!-- Columna reserva -->
+      <div class="hab-detalle-reserva slide-up" style="animation-delay:0.2s">
+        <div class="reserva-card">
+          <div class="reserva-card-header">
+            <span class="reserva-precio-num">S/. {{hab.precio}}</span>
+            <span class="reserva-precio-label">por noche</span>
+          </div>
+          <div class="reserva-card-body">
+            <div class="form-group">
+              <label>Fecha de llegada</label>
+              <input type="date" id="llegadaDetalle" class="input-field">
+            </div>
+            <div class="form-group">
+              <label>Fecha de salida</label>
+              <input type="date" id="salidaDetalle" class="input-field">
+            </div>
+            <div class="form-group">
+              <label>N° de huéspedes</label>
+              <select class="input-field" id="huespedesDetalle">
+                <option value="1">1 persona</option>
+                <option value="2" selected>2 personas</option>
+              </select>
+            </div>
+            <a href="/reservas?habitacion={{hab.nombre}}" class="btn btn-gold btn-block" id="btnReservarDetalle">
+              Reservar esta habitación
+            </a>
+            <p class="reserva-nota">Sin cargos adicionales por reserva online</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Otras habitaciones -->
+    {{#if otraHabitaciones}}
+    <div class="otras-hab-section">
+      <h3 class="otras-hab-titulo">También le puede interesar</h3>
+      <div class="rooms-grid rooms-grid-2">
+        {{#each otraHabitaciones}}
+        <article class="room-card">
+          <a href="/habitaciones/{{slug}}" class="room-card-link">
+            <div class="room-img-wrap">
+              <img src="{{imagen}}" alt="{{imagenAlt}}" loading="lazy"
+                   onerror="this.parentElement.classList.add('img-placeholder'); this.style.display='none'">
+            </div>
+            <div class="room-card-body">
+              <span class="room-tier">{{categoria}}</span>
+              <h3 class="room-name">{{nombre}}</h3>
+              <p class="room-desc">{{descripcionCorta}}</p>
+            </div>
+            <div class="room-card-footer">
+              <div class="room-price">Desde S/. {{precio}} <small>/ noche</small></div>
+              <span class="btn btn-dark-sm">Ver detalles</span>
+            </div>
+          </a>
+        </article>
+        {{/each}}
+      </div>
+    </div>
+    {{/if}}
+
+  </div>
+</section>
