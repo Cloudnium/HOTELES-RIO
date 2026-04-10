@@ -1,0 +1,137 @@
+<!-- ============================================================
+  BOTÓN DE WHATSAPP FLOTANTE
+  ────────────────────────────────────────────────────────────
+  EDITA SOLO ESTA LÍNEA para poner tu número real:
+  Cambia 51999999999 por tu número con código de país sin "+"
+  Ejemplo Perú: 51 + tu número sin ceros → 51987654321
+  ────────────────────────────────────────────────────────────
+  MENSAJE: Edita el texto después de "text=" (URL-encoded)
+============================================================ -->
+
+{{!-- ⬇️  CAMBIA AQUÍ TU NÚMERO DE WHATSAPP  ⬇️ --}}
+{{#*inline "waNumber"}}51999999999{{/inline}}
+{{#*inline "waMessage"}}Hola, me gustaría hacer una consulta sobre Hoteles Rio 🏨{{/inline}}
+
+<a
+  id="waBubble"
+  class="wa-bubble"
+  href="https://wa.me/51999999999?text=Hola%2C%20me%20gustar%C3%ADa%20hacer%20una%20consulta%20sobre%20Hoteles%20Rio%20%F0%9F%8F%A8"
+  target="_blank"
+  rel="noopener noreferrer"
+  aria-label="Contáctenos por WhatsApp"
+  title="Escríbenos por WhatsApp"
+>
+  <!-- Ícono oficial de WhatsApp en SVG -->
+  <svg class="wa-icon" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <path d="M16 .5C7.44.5.5 7.44.5 16c0 2.72.7 5.28 1.93 7.5L.5 31.5l8.22-1.9A15.46 15.46 0 0 0 16 31.5C24.56 31.5 31.5 24.56 31.5 16S24.56.5 16 .5Z" fill="#25D366"/>
+    <path d="M23.5 19.9c-.38-.19-2.24-1.1-2.59-1.23-.35-.12-.6-.19-.85.19-.25.38-.97 1.23-1.19 1.48-.22.25-.43.28-.81.09-.38-.19-1.6-.59-3.05-1.88-1.13-1-1.89-2.24-2.11-2.62-.22-.38-.02-.58.17-.77.17-.17.38-.43.57-.65.19-.22.25-.38.38-.63.13-.25.06-.47-.03-.66-.09-.19-.85-2.05-1.17-2.8-.31-.74-.62-.64-.85-.65H11c-.22 0-.57.08-.87.38-.3.3-1.14 1.11-1.14 2.72 0 1.6 1.17 3.15 1.33 3.37.16.22 2.3 3.52 5.58 4.93.78.34 1.39.54 1.86.69.78.25 1.49.21 2.05.13.63-.09 1.93-.79 2.2-1.55.28-.76.28-1.42.19-1.55-.08-.13-.3-.22-.68-.4Z" fill="#fff"/>
+  </svg>
+
+  <!-- Tooltip emergente -->
+  <span class="wa-tooltip">¿Necesita ayuda?<br><strong>¡Escríbanos!</strong></span>
+
+  <!-- Pulso animado -->
+  <span class="wa-pulse"></span>
+</a>
+
+<style>
+/* ── Botón WhatsApp flotante ──────────────────────────────── */
+.wa-bubble {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 9990;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #25D366;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 24px rgba(37,211,102,.45);
+  text-decoration: none;
+  transition: transform .25s ease, box-shadow .25s ease;
+  /* Entrada animada */
+  animation: waEntrada .6s cubic-bezier(.34,1.56,.64,1) .8s both;
+}
+
+.wa-bubble:hover {
+  transform: scale(1.12);
+  box-shadow: 0 10px 32px rgba(37,211,102,.55);
+}
+
+.wa-icon {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+/* Pulso ─────────────────────────────────────────────────── */
+.wa-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #25D366;
+  animation: waPulse 2.2s ease-out infinite;
+  z-index: 0;
+}
+
+/* Tooltip ───────────────────────────────────────────────── */
+.wa-tooltip {
+  position: absolute;
+  right: calc(100% + 14px);
+  bottom: 50%;
+  transform: translateY(50%);
+  background: #fff;
+  color: #1a1a1a;
+  font-family: 'Jost', sans-serif;
+  font-size: 12.5px;
+  font-weight: 300;
+  line-height: 1.45;
+  white-space: nowrap;
+  padding: 10px 14px;
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.13);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(50%) translateX(6px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+
+/* Flecha del tooltip */
+.wa-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-left-color: #fff;
+}
+
+.wa-bubble:hover .wa-tooltip {
+  opacity: 1;
+  transform: translateY(50%) translateX(0);
+}
+
+/* Keyframes ─────────────────────────────────────────────── */
+@keyframes waPulse {
+  0%   { transform: scale(1);   opacity: .6; }
+  70%  { transform: scale(1.55); opacity: 0; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+
+@keyframes waEntrada {
+  from { opacity: 0; transform: scale(0) rotate(-15deg); }
+  to   { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+/* Mobile ────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .wa-bubble { bottom: 18px; right: 18px; width: 54px; height: 54px; }
+  .wa-icon   { width: 30px; height: 30px; }
+  .wa-tooltip { display: none; } /* Evita solapamientos en móvil */
+}
+</style>
