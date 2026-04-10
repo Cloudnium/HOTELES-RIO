@@ -123,7 +123,7 @@ app.get('/galeria', (req, res) => {
   // GALERÍA: Edita este array para agregar/quitar fotos
   // Coloca las imágenes en public/images/gallery/
   const fotos = [
-    { src: '/images/gallery/foto1.jpg', alt: 'Exterior del hotel', categoria: 'Exterior' },
+    { src: '/images/gallery/foto1.png', alt: 'Exterior del hotel', categoria: 'Exterior' },
     { src: '/images/gallery/foto2.jpg', alt: 'Lobby principal', categoria: 'Interiores' },
     { src: '/images/gallery/foto3.jpg', alt: 'Habitación Suite', categoria: 'Habitaciones' },
     { src: '/images/gallery/foto4.jpg', alt: 'Habitación Premium', categoria: 'Habitaciones' },
