@@ -545,14 +545,14 @@ address { font-style: normal; }
   font-family: var(--font-body);
   font-size: 14px;
   font-weight: 300;
-  color: var(--white);
+  color: var(--black);
   outline: none;
   width: 100%;
   border-radius: var(--radius);
   transition: border-color var(--transition);
 }
 .input-field:focus { border-color: var(--gold); }
-.input-field option { background: var(--charcoal); }
+.input-field option { background: #ffffff; color: #1E1812; }
 
 /* ── Esencia ────────────────────────────────────────────── */
 .esencia {
