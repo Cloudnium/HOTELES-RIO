@@ -131,7 +131,7 @@ app.get('/galeria', (req, res) => {
     { src: '/images/gallery/foto6.png', alt: 'Área de descanso', categoria: 'Interiores' },
     { src: '/images/gallery/foto7.png', alt: 'Baño Suite', categoria: 'Habitaciones' },
     { src: '/images/gallery/foto8.png', alt: 'Piscina', categoria: 'Instalaciones' },
-    { src: '/images/gallery/foto9.png', alt: 'Estacionamiento', categoria: 'Exterior' },
+    { src: '/images/gallery/foto9.png', alt: 'Estacionamiento', categoria: 'Estacionamiento' },
   ];
   res.render('galeria', {
     title: 'Galería',
