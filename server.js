@@ -124,14 +124,14 @@ app.get('/galeria', (req, res) => {
   // Coloca las imágenes en public/images/gallery/
   const fotos = [
     { src: '/images/gallery/foto1.png', alt: 'Exterior del hotel', categoria: 'Exterior' },
-    { src: '/images/gallery/foto2.jpg', alt: 'Lobby principal', categoria: 'Interiores' },
-    { src: '/images/gallery/foto3.jpg', alt: 'Habitación Suite', categoria: 'Habitaciones' },
-    { src: '/images/gallery/foto4.jpg', alt: 'Habitación Premium', categoria: 'Habitaciones' },
-    { src: '/images/gallery/foto5.jpg', alt: 'Jardines del hotel', categoria: 'Exterior' },
-    { src: '/images/gallery/foto6.jpg', alt: 'Área de descanso', categoria: 'Interiores' },
-    { src: '/images/gallery/foto7.jpg', alt: 'Baño Suite', categoria: 'Habitaciones' },
-    { src: '/images/gallery/foto8.jpg', alt: 'Piscina', categoria: 'Instalaciones' },
-    { src: '/images/gallery/foto9.jpg', alt: 'Estacionamiento', categoria: 'Exterior' },
+    { src: '/images/gallery/foto2.png', alt: 'Lobby principal', categoria: 'Interiores' },
+    { src: '/images/gallery/foto3.png', alt: 'Habitación Suite', categoria: 'Habitaciones' },
+    { src: '/images/gallery/foto4.png', alt: 'Habitación Premium', categoria: 'Habitaciones' },
+    { src: '/images/gallery/foto5.png', alt: 'Jardines del hotel', categoria: 'Exterior' },
+    { src: '/images/gallery/foto6.png', alt: 'Área de descanso', categoria: 'Interiores' },
+    { src: '/images/gallery/foto7.png', alt: 'Baño Suite', categoria: 'Habitaciones' },
+    { src: '/images/gallery/foto8.png', alt: 'Piscina', categoria: 'Instalaciones' },
+    { src: '/images/gallery/foto9.png', alt: 'Estacionamiento', categoria: 'Exterior' },
   ];
   res.render('galeria', {
     title: 'Galería',
