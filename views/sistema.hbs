@@ -131,11 +131,8 @@
         <section id="sec-habitaciones" class="sys-section active">
           <div class="sec-toolbar">
             <div class="sec-toolbar-left">
-              <select id="filter-piso" class="sys-select">
+              <select id="filter-piso" class="sys-select" style="display:none">
                 <option value="">Todos los pisos</option>
-                <option value="1">Piso 1</option>
-                <option value="2">Piso 2</option>
-                <option value="3">Piso 3</option>
               </select>
               <select id="filter-estado" class="sys-select">
                 <option value="">Todos los estados</option>
@@ -240,7 +237,11 @@
         <!-- ═══ CAJAS ═══ -->
         <section id="sec-cajas" class="sys-section">
           <div class="sec-toolbar">
-            <h2 style="font-size:15px;font-weight:700">Cajas del día — <span id="caja-fecha"></span></h2>
+            <div class="sec-toolbar-left">
+              <label style="font-size:11px;color:var(--text-light);letter-spacing:1px;text-transform:uppercase">Fecha</label>
+              <input type="date" class="sys-input" id="caja-hist-fecha">
+              <h2 style="font-size:15px;font-weight:700;color:var(--charcoal)">Cajas — <span id="caja-fecha"></span></h2>
+            </div>
             <button class="sys-btn sys-btn-gold" id="btn-abrir-caja">
               <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
               Abrir mi caja
@@ -303,8 +304,9 @@
             <div class="sec-toolbar-left">
               <select id="filter-comp-tipo" class="sys-select">
                 <option value="">Todos los tipos</option>
-                <option value="habitacion">Habitaciones</option>
-                <option value="tienda">Tienda Pública</option>
+                <option value="HAB">Habitaciones</option>
+                <option value="PUB">Tienda Pública</option>
+                <option value="CAJA">Resumen Caja</option>
               </select>
               <input type="date" class="sys-input" id="filter-comp-desde">
               <input type="date" class="sys-input" id="filter-comp-hasta">

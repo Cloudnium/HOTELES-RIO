@@ -384,3 +384,22 @@ tr:hover td { background: #fdf9f2; }
 }
 .stock-op-btn:hover { border-color: var(--gold); }
 .stock-ajuste-controls .sys-input { flex: 1; text-align: center; font-size: 16px; }
+
+/* ── Categorías de habitaciones ─────────────────────────── */
+.cat-group { margin-bottom: 28px; }
+.cat-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; margin-bottom: 12px;
+  background: var(--white); border-radius: 2px;
+  border-left: 4px solid var(--gold);
+  box-shadow: 0 1px 3px rgba(44,38,32,.06);
+}
+.cat-group-label {
+  font-family: var(--font-display); font-size: 17px; font-weight: 400;
+  letter-spacing: .5px;
+}
+.cat-group-count { font-size: 11px; color: var(--text-light); letter-spacing: 1px; }
+.cat-rooms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px,1fr)); gap: 12px; }
+
+/* ── Caja actions ───────────────────────────────────────── */
+.caja-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
