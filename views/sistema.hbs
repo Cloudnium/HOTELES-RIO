@@ -83,6 +83,10 @@
           <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           Reportes
         </a>
+        <a class="sys-nav-item" data-sec="comprobantes">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Comprobantes
+        </a>
 
         <div class="sys-nav-group">ADMINISTRACIÓN</div>
         <a class="sys-nav-item" data-sec="clientes">
@@ -227,7 +231,7 @@
           <div class="stats-row-sys" id="almacen-stats"></div>
           <div class="sys-card">
             <div class="table-wrap"><table>
-              <thead><tr><th>Código</th><th>Producto</th><th>Categoría</th><th>Precio Compra</th><th>Precio Venta</th><th>Stock</th><th>Alerta mínima</th><th>Estado</th><th></th></tr></thead>
+              <thead><tr><th>Código</th><th>Producto</th><th>Categoría</th><th>Precio Venta</th><th>Stock</th><th>Alerta mínima</th><th>Estado</th><th></th></tr></thead>
               <tbody id="products-table"><tr><td colspan="9" class="empty-row">Cargando productos...</td></tr></tbody>
             </table></div>
           </div>
@@ -269,14 +273,14 @@
           <div class="stats-row-sys" id="reporte-stats"></div>
           <div class="two-col-layout">
             <div class="sys-card">
-              <div class="sys-card-head"><h3>Ingresos por habitaciones</h3></div>
+              <div class="sys-card-head"><h3>Ingresos por Habitaciones + Consumos</h3></div>
               <div class="table-wrap"><table>
                 <thead><tr><th>Habitación</th><th>Noches</th><th>Total</th></tr></thead>
                 <tbody id="reporte-habitaciones"><tr><td colspan="3" class="empty-row">Genera un reporte para ver datos</td></tr></tbody>
               </table></div>
             </div>
             <div class="sys-card">
-              <div class="sys-card-head"><h3>Ingresos por ventas</h3></div>
+              <div class="sys-card-head"><h3>Ingresos Tienda Pública</h3></div>
               <div class="table-wrap"><table>
                 <thead><tr><th>Producto</th><th>Cantidad</th><th>Total</th></tr></thead>
                 <tbody id="reporte-ventas"><tr><td colspan="3" class="empty-row">Genera un reporte para ver datos</td></tr></tbody>
@@ -286,8 +290,36 @@
           <div class="sys-card" style="margin-top:20px">
             <div class="sys-card-head"><h3>Detalle de Check-ins / Check-outs</h3></div>
             <div class="table-wrap"><table>
-              <thead><tr><th>Hab.</th><th>Cliente</th><th>Check-in</th><th>Check-out</th><th>Noches</th><th>Habitación</th><th>Consumos</th><th>Total</th></tr></thead>
+              <thead><tr><th>Serie</th><th>Hab.</th><th>Cliente</th><th>Check-in</th><th>Check-out</th><th>Noches</th><th>Hab.</th><th>Consumos</th><th>Pago</th><th>Total</th></tr></thead>
               <tbody id="reporte-checkins"><tr><td colspan="8" class="empty-row">Genera un reporte para ver datos</td></tr></tbody>
+            </table></div>
+          </div>
+        </section>
+
+        <!-- ═══ COMPROBANTES ═══ -->
+        <section id="sec-comprobantes" class="sys-section">
+          <div class="sec-toolbar">
+            <input type="text" class="sys-input" id="search-comprobante" placeholder="Buscar por serie (T001-00000001)...">
+            <div class="sec-toolbar-left">
+              <select id="filter-comp-tipo" class="sys-select">
+                <option value="">Todos los tipos</option>
+                <option value="habitacion">Habitaciones</option>
+                <option value="tienda">Tienda Pública</option>
+              </select>
+              <input type="date" class="sys-input" id="filter-comp-desde">
+              <input type="date" class="sys-input" id="filter-comp-hasta">
+              <button class="sys-btn sys-btn-gold" id="btn-filtrar-comp">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Buscar
+              </button>
+            </div>
+          </div>
+          <div class="stats-row-sys" id="comp-stats"></div>
+          <div class="sys-card">
+            <div class="sys-card-head"><h3>Historial de comprobantes</h3></div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Serie</th><th>Tipo</th><th>Fecha / Hora</th><th>Cliente / Descripción</th><th>Método Pago</th><th>Total</th><th>Reimprimir</th></tr></thead>
+              <tbody id="comprobantes-table"><tr><td colspan="7" class="empty-row">Cargando comprobantes...</td></tr></tbody>
             </table></div>
           </div>
         </section>
@@ -412,11 +444,32 @@
             <option value="otros">Otros</option>
           </select>
         </div>
-        <div class="form-field"><label>Precio de compra (S/.)</label><input type="number" id="prod-precio-compra" class="sys-input" placeholder="0.00" step="0.01"></div>
         <div class="form-field"><label>Precio de venta (S/.)</label><input type="number" id="prod-precio-venta" class="sys-input" placeholder="0.00" step="0.01"></div>
-        <div class="form-field"><label>Stock actual</label><input type="number" id="prod-stock" class="sys-input" placeholder="0"></div>
         <div class="form-field"><label>Stock mínimo (alerta)</label><input type="number" id="prod-stock-min" class="sys-input" placeholder="5"></div>
         <input type="hidden" id="prod-id">
+      </div>
+      <!-- Stock actual (solo edición) -->
+      <div id="stock-edit-section" style="display:none">
+        <div class="stock-divider">
+          <span>Stock actual: <strong id="prod-stock-actual">0</strong> unidades</span>
+        </div>
+        <div class="stock-ajuste-grid">
+          <div class="form-field">
+            <label>Ajuste de stock</label>
+            <div class="stock-ajuste-controls">
+              <button type="button" class="stock-op-btn" id="btn-stock-restar">−</button>
+              <input type="number" id="prod-stock-ajuste" class="sys-input" value="0" min="0" placeholder="0">
+              <button type="button" class="stock-op-btn btn-sumar" id="btn-stock-sumar">+</button>
+            </div>
+            <small id="stock-resultado-preview" style="color:var(--text-light);font-size:11px;margin-top:4px;display:block"></small>
+          </div>
+        </div>
+      </div>
+      <!-- Stock nuevo (solo creación) -->
+      <div id="stock-nuevo-section">
+        <div class="form-grid-2">
+          <div class="form-field"><label>Stock inicial</label><input type="number" id="prod-stock" class="sys-input" placeholder="0"></div>
+        </div>
       </div>
       <div class="form-actions">
         <button class="sys-btn sys-btn-outline" data-modal="modal-producto">Cancelar</button>

@@ -366,3 +366,21 @@ tr:hover td { background: #fdf9f2; }
 /* ── Checkout total row ─────────────────────────────────── */
 .checkout-total { font-weight: 700; font-size: 15px; font-family: var(--font-display); }
 .checkout-total span:last-child { color: var(--gold); font-size: 18px; }
+
+/* ── Stock ajuste controls ──────────────────────────────── */
+.stock-divider {
+  background: #faf8f4; border-radius: 2px; padding: 10px 14px;
+  font-size: 13px; color: var(--text-mid); margin: 14px 0 10px;
+  border-left: 3px solid var(--gold);
+}
+.stock-divider strong { color: var(--charcoal); font-size: 16px; font-family: var(--font-display); }
+.stock-ajuste-grid { margin-bottom: 4px; }
+.stock-ajuste-controls { display: flex; align-items: center; gap: 8px; }
+.stock-op-btn {
+  width: 38px; height: 38px; border-radius: 2px; border: 1.5px solid var(--cream-dark);
+  background: var(--white); font-size: 20px; cursor: pointer; transition: var(--transition);
+  display: flex; align-items: center; justify-content: center; font-family: monospace;
+  color: var(--charcoal); flex-shrink: 0;
+}
+.stock-op-btn:hover { border-color: var(--gold); }
+.stock-ajuste-controls .sys-input { flex: 1; text-align: center; font-size: 16px; }
