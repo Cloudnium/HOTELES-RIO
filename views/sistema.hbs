@@ -1,9 +1,8 @@
-<!-- Sistema de Gestión Hotelera - Hoteles Rio -->
+<!-- Sistema de Gestión Hotelera - Hoteles Rio v5 -->
 <div id="sistema-app">
 
-  <!-- ══════════════════ LOGIN SCREEN ══════════════════ -->
+  <!-- ══ LOGIN ══ -->
   <div id="login-screen" class="login-screen">
-    <div class="login-overlay"></div>
     <div class="login-card">
       <div class="login-brand">
         <img src="/images/logos/logo.png" alt="Hoteles Rio" class="login-logo-img">
@@ -21,14 +20,14 @@
         <div class="login-field">
           <label>Contraseña</label>
           <div class="input-icon-wrap">
-            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
           </div>
         </div>
         <div id="login-error" class="login-error" style="display:none"></div>
         <button id="login-btn" class="login-submit">
           <span id="login-btn-text">Ingresar al Sistema</span>
-          <svg id="login-spinner" viewBox="0 0 24 24" style="display:none" class="spin"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="32"/></svg>
+          <svg id="login-spinner" viewBox="0 0 24 24" style="display:none" class="spin" width="18" height="18"><circle cx="12" cy="12" r="10" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="32" stroke-dashoffset="8"/></svg>
         </button>
       </div>
       <div class="login-footer-note">
@@ -38,7 +37,7 @@
     </div>
   </div>
 
-  <!-- ══════════════════ DASHBOARD ══════════════════ -->
+  <!-- ══ DASHBOARD ══ -->
   <div id="dashboard" class="dashboard" style="display:none">
 
     <!-- Sidebar -->
@@ -54,48 +53,39 @@
       </div>
 
       <nav class="sys-nav">
-        <div class="sys-nav-group">PRINCIPAL</div>
+        <div class="sys-nav-group">Principal</div>
         <a class="sys-nav-item active" data-sec="habitaciones">
-          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-          Habitaciones
+          <i class="fas fa-bed fa-fw"></i> Habitaciones
         </a>
         <a class="sys-nav-item" data-sec="tienda-hab">
-          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-          Tienda x Habitación
+          <i class="fas fa-concierge-bell fa-fw"></i> Tienda x Habitación
         </a>
         <a class="sys-nav-item" data-sec="tienda-publica">
-          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          Tienda Pública
+          <i class="fas fa-shopping-cart fa-fw"></i> Tienda Pública
         </a>
 
-        <div class="sys-nav-group">INVENTARIO</div>
+        <div class="sys-nav-group">Inventario</div>
         <a class="sys-nav-item" data-sec="almacen">
-          <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-          Almacén
+          <i class="fas fa-boxes fa-fw"></i> Almacén
         </a>
 
-        <div class="sys-nav-group">FINANZAS</div>
+        <div class="sys-nav-group">Finanzas</div>
         <a class="sys-nav-item" data-sec="cajas">
-          <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-          Cajas del Día
+          <i class="fas fa-cash-register fa-fw"></i> Cajas del Día
         </a>
         <a class="sys-nav-item" data-sec="reportes">
-          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          Reportes
+          <i class="fas fa-chart-bar fa-fw"></i> Reportes
         </a>
         <a class="sys-nav-item" data-sec="comprobantes">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          Comprobantes
+          <i class="fas fa-file-invoice fa-fw"></i> Comprobantes
         </a>
 
-        <div class="sys-nav-group">ADMINISTRACIÓN</div>
+        <div class="sys-nav-group">Administración</div>
         <a class="sys-nav-item" data-sec="clientes">
-          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Clientes
+          <i class="fas fa-users fa-fw"></i> Clientes
         </a>
         <a class="sys-nav-item" data-sec="usuarios">
-          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          Usuarios
+          <i class="fas fa-user-cog fa-fw"></i> Usuarios
         </a>
       </nav>
 
@@ -111,7 +101,7 @@
       </div>
     </aside>
 
-    <!-- Main content -->
+    <!-- Main -->
     <div class="sys-main">
       <header class="sys-topbar">
         <div class="sys-topbar-left">
@@ -121,6 +111,10 @@
           <h1 id="sys-section-title">Habitaciones</h1>
         </div>
         <div class="sys-topbar-right">
+          <div id="caja-status-topbar" class="caja-status-topbar cerrada">
+            <span class="dot"></span>
+            <span id="caja-status-text">Sin caja</span>
+          </div>
           <span id="sys-date-badge" class="sys-date-badge"></span>
         </div>
       </header>
@@ -131,9 +125,7 @@
         <section id="sec-habitaciones" class="sys-section active">
           <div class="sec-toolbar">
             <div class="sec-toolbar-left">
-              <select id="filter-piso" class="sys-select" style="display:none">
-                <option value="">Todos los pisos</option>
-              </select>
+              <select id="filter-piso" class="sys-select" style="display:none"><option value="">Todos los pisos</option></select>
               <select id="filter-estado" class="sys-select">
                 <option value="">Todos los estados</option>
                 <option value="disponible">Disponible</option>
@@ -159,17 +151,13 @@
         <!-- ═══ TIENDA x HABITACIÓN ═══ -->
         <section id="sec-tienda-hab" class="sys-section">
           <div class="sec-toolbar">
-            <select id="sel-hab-tienda" class="sys-select">
+            <select id="sel-hab-tienda" class="sys-select" style="min-width:240px">
               <option value="">Seleccionar habitación ocupada...</option>
             </select>
-            <button class="sys-btn sys-btn-gold" id="btn-nueva-venta-hab">
-              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Agregar consumo
-            </button>
           </div>
           <div class="two-col-layout">
             <div class="sys-card">
-              <div class="sys-card-head"><h3>Consumos de la habitación</h3></div>
+              <div class="sys-card-head"><h3><i class="fas fa-list-ul" style="color:var(--primary);margin-right:6px"></i>Consumos de la habitación</h3></div>
               <div class="table-wrap"><table>
                 <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Hora</th><th></th></tr></thead>
                 <tbody id="consumos-hab-list"><tr><td colspan="6" class="empty-row">Selecciona una habitación ocupada</td></tr></tbody>
@@ -177,11 +165,10 @@
               <div class="sys-card-foot">
                 <span>Total habitación:</span>
                 <strong id="total-consumos-hab">S/. 0.00</strong>
-                <button class="sys-btn sys-btn-gold" id="btn-cobrar-habitacion" style="margin-left:auto">Registrar en Check-out</button>
               </div>
             </div>
             <div class="sys-card">
-              <div class="sys-card-head"><h3>Productos disponibles</h3></div>
+              <div class="sys-card-head"><h3><i class="fas fa-shopping-bag" style="color:var(--primary);margin-right:6px"></i>Productos disponibles</h3></div>
               <div class="products-quick-grid" id="products-quick"></div>
             </div>
           </div>
@@ -189,28 +176,61 @@
 
         <!-- ═══ TIENDA PÚBLICA ═══ -->
         <section id="sec-tienda-publica" class="sys-section">
-          <div class="sec-toolbar">
-            <input type="text" class="sys-input" id="search-product-pub" placeholder="Buscar producto...">
-            <button class="sys-btn sys-btn-gold" id="btn-nueva-venta-pub">
-              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Nueva venta
-            </button>
-          </div>
-          <div class="two-col-layout">
-            <div class="sys-card">
-              <div class="sys-card-head"><h3>Ventas de hoy</h3></div>
-              <div class="table-wrap"><table>
-                <thead><tr><th>Hora</th><th>Productos</th><th>Total</th><th>Cajero</th></tr></thead>
-                <tbody id="ventas-pub-list"><tr><td colspan="4" class="empty-row">Sin ventas hoy</td></tr></tbody>
-              </table></div>
+          <div class="tienda-pub-layout">
+            <!-- Catálogo -->
+            <div class="catalogo-section">
+              <div class="sys-card">
+                <div class="sys-card-head">
+                  <h3><i class="fas fa-store" style="color:var(--primary);margin-right:6px"></i>Catálogo de Productos</h3>
+                  <span id="ventas-hoy-count" class="total-badge">0 ventas hoy</span>
+                </div>
+                <div style="padding:14px 14px 0">
+                  <div class="catalogo-search-bar">
+                    <input type="text" class="sys-input" id="search-product-pub" placeholder="🔍 Buscar producto...">
+                    <select id="filter-cat-pub" class="sys-select">
+                      <option value="">Todas las categorías</option>
+                      <option value="bebidas">Bebidas</option>
+                      <option value="snacks">Snacks/Alimentos</option>
+                      <option value="higiene">Higiene</option>
+                      <option value="servicios">Servicios</option>
+                      <option value="otros">Otros</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="productos-grid" id="products-catalog" style="padding:14px"></div>
+              </div>
+              <!-- Ventas del día -->
+              <div class="sys-card">
+                <div class="sys-card-head"><h3><i class="fas fa-history" style="color:var(--primary);margin-right:6px"></i>Ventas de hoy</h3></div>
+                <div class="table-wrap"><table>
+                  <thead><tr><th>Hora</th><th>Productos</th><th>Total</th><th>Cajero</th></tr></thead>
+                  <tbody id="ventas-pub-list"><tr><td colspan="4" class="empty-row">Sin ventas hoy</td></tr></tbody>
+                </table></div>
+              </div>
             </div>
-            <div class="sys-card">
-              <div class="sys-card-head"><h3>Catálogo de productos</h3><span id="total-venta-pub" class="total-badge">S/. 0.00</span></div>
-              <div class="products-quick-grid" id="products-catalog"></div>
-              <div class="sys-card-foot">
-                <span>Total a cobrar:</span>
-                <strong id="total-pub-display">S/. 0.00</strong>
-                <button class="sys-btn sys-btn-gold" id="btn-confirmar-venta-pub" style="margin-left:auto">Confirmar venta</button>
+
+            <!-- Carrito -->
+            <div class="carrito-section" id="carrito-section">
+              <div class="carrito-header">
+                <h3><i class="fas fa-shopping-cart" style="color:var(--primary)"></i> Carrito <span class="carrito-badge" id="carrito-count">0</span></h3>
+                <button class="sys-btn sys-btn-outline sys-btn-sm" id="btn-limpiar-carrito">Limpiar</button>
+              </div>
+              <div class="carrito-items" id="carrito-items">
+                <div class="carrito-empty">
+                  <i class="fas fa-shopping-basket"></i>
+                  <p style="font-size:13px;font-weight:500;color:var(--text-2)">Carrito vacío</p>
+                  <p style="font-size:11px;color:var(--text-3);margin-top:4px">Haz clic en un producto para agregarlo</p>
+                </div>
+              </div>
+              <div class="carrito-footer">
+                <div class="carrito-total-row">
+                  <span class="carrito-total-label">Total a cobrar</span>
+                  <span class="carrito-total-val" id="carrito-total">S/. 0.00</span>
+                </div>
+                <button class="carrito-btn-cobrar" id="btn-confirmar-venta-pub">
+                  <i class="fas fa-cash-register"></i> Cobrar
+                </button>
+                <button class="carrito-btn-limpiar" id="btn-nueva-venta-pub">Limpiar carrito</button>
               </div>
             </div>
           </div>
@@ -219,17 +239,16 @@
         <!-- ═══ ALMACÉN ═══ -->
         <section id="sec-almacen" class="sys-section">
           <div class="sec-toolbar">
-            <h2 style="font-size:15px;font-weight:700">Inventario de productos</h2>
+            <h2 style="font-size:15px;font-weight:700;color:var(--text-1)">Inventario de productos</h2>
             <button class="sys-btn sys-btn-gold" id="btn-add-product">
-              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Nuevo producto
+              <i class="fas fa-plus"></i> Nuevo producto
             </button>
           </div>
           <div class="stats-row-sys" id="almacen-stats"></div>
           <div class="sys-card">
             <div class="table-wrap"><table>
-              <thead><tr><th>Código</th><th>Producto</th><th>Categoría</th><th>Precio Venta</th><th>Stock</th><th>Alerta mínima</th><th>Estado</th><th></th></tr></thead>
-              <tbody id="products-table"><tr><td colspan="9" class="empty-row">Cargando productos...</td></tr></tbody>
+              <thead><tr><th>Código</th><th>Producto</th><th>Categoría</th><th>Precio Venta</th><th>Stock</th><th>Alerta mínima</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <tbody id="products-table"><tr><td colspan="8" class="empty-row">Cargando productos...</td></tr></tbody>
             </table></div>
           </div>
         </section>
@@ -238,18 +257,17 @@
         <section id="sec-cajas" class="sys-section">
           <div class="sec-toolbar">
             <div class="sec-toolbar-left">
-              <label style="font-size:11px;color:var(--text-light);letter-spacing:1px;text-transform:uppercase">Fecha</label>
+              <label style="font-size:11px;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px">Fecha</label>
               <input type="date" class="sys-input" id="caja-hist-fecha">
-              <h2 style="font-size:15px;font-weight:700;color:var(--charcoal)">Cajas — <span id="caja-fecha"></span></h2>
+              <span id="caja-fecha" style="font-size:14px;font-weight:600;color:var(--text-1)"></span>
             </div>
             <button class="sys-btn sys-btn-gold" id="btn-abrir-caja">
-              <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-              Abrir mi caja
+              <i class="fas fa-lock-open"></i> Abrir mi caja
             </button>
           </div>
           <div id="cajas-grid" class="cajas-grid"></div>
-          <div class="sys-card" style="margin-top:20px">
-            <div class="sys-card-head"><h3>Movimientos de mi caja hoy</h3></div>
+          <div class="sys-card">
+            <div class="sys-card-head"><h3><i class="fas fa-list" style="color:var(--primary);margin-right:6px"></i>Movimientos</h3></div>
             <div class="table-wrap"><table>
               <thead><tr><th>Hora</th><th>Concepto</th><th>Tipo</th><th>Monto</th></tr></thead>
               <tbody id="caja-movimientos"><tr><td colspan="4" class="empty-row">Sin movimientos</td></tr></tbody>
@@ -257,7 +275,7 @@
           </div>
         </section>
 
-        <!-- ═══ REPORTES ═══ -->
+        <!-- ═══ REPORTES — Auto por fecha ═══ -->
         <section id="sec-reportes" class="sys-section">
           <div class="sec-toolbar">
             <div class="date-filter-group">
@@ -265,34 +283,32 @@
               <input type="date" class="sys-input" id="reporte-desde">
               <label>Hasta</label>
               <input type="date" class="sys-input" id="reporte-hasta">
-              <button class="sys-btn sys-btn-gold" id="btn-generar-reporte">
-                <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                Generar reporte
-              </button>
             </div>
           </div>
-          <div class="stats-row-sys" id="reporte-stats"></div>
+          <div class="stats-row-sys" id="reporte-stats">
+            <div class="stat-card-sys"><p>Selecciona fechas</p><h3>—</h3></div>
+          </div>
           <div class="two-col-layout">
             <div class="sys-card">
               <div class="sys-card-head"><h3>Ingresos por Habitaciones + Consumos</h3></div>
               <div class="table-wrap"><table>
                 <thead><tr><th>Habitación</th><th>Noches</th><th>Total</th></tr></thead>
-                <tbody id="reporte-habitaciones"><tr><td colspan="3" class="empty-row">Genera un reporte para ver datos</td></tr></tbody>
+                <tbody id="reporte-habitaciones"><tr><td colspan="3" class="empty-row">Selecciona un rango de fechas</td></tr></tbody>
               </table></div>
             </div>
             <div class="sys-card">
               <div class="sys-card-head"><h3>Ingresos Tienda Pública</h3></div>
               <div class="table-wrap"><table>
                 <thead><tr><th>Producto</th><th>Cantidad</th><th>Total</th></tr></thead>
-                <tbody id="reporte-ventas"><tr><td colspan="3" class="empty-row">Genera un reporte para ver datos</td></tr></tbody>
+                <tbody id="reporte-ventas"><tr><td colspan="3" class="empty-row">Selecciona un rango de fechas</td></tr></tbody>
               </table></div>
             </div>
           </div>
-          <div class="sys-card" style="margin-top:20px">
+          <div class="sys-card">
             <div class="sys-card-head"><h3>Detalle de Check-ins / Check-outs</h3></div>
             <div class="table-wrap"><table>
               <thead><tr><th>Serie</th><th>Hab.</th><th>Cliente</th><th>Check-in</th><th>Check-out</th><th>Noches</th><th>Hab.</th><th>Consumos</th><th>Pago</th><th>Total</th></tr></thead>
-              <tbody id="reporte-checkins"><tr><td colspan="8" class="empty-row">Genera un reporte para ver datos</td></tr></tbody>
+              <tbody id="reporte-checkins"><tr><td colspan="10" class="empty-row">Selecciona un rango de fechas</td></tr></tbody>
             </table></div>
           </div>
         </section>
@@ -300,7 +316,7 @@
         <!-- ═══ COMPROBANTES ═══ -->
         <section id="sec-comprobantes" class="sys-section">
           <div class="sec-toolbar">
-            <input type="text" class="sys-input" id="search-comprobante" placeholder="Buscar por serie (T001-00000001)...">
+            <input type="text" class="sys-input" id="search-comprobante" placeholder="🔍 Buscar por serie...">
             <div class="sec-toolbar-left">
               <select id="filter-comp-tipo" class="sys-select">
                 <option value="">Todos los tipos</option>
@@ -311,8 +327,7 @@
               <input type="date" class="sys-input" id="filter-comp-desde">
               <input type="date" class="sys-input" id="filter-comp-hasta">
               <button class="sys-btn sys-btn-gold" id="btn-filtrar-comp">
-                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                Buscar
+                <i class="fas fa-search"></i> Buscar
               </button>
             </div>
           </div>
@@ -321,7 +336,7 @@
             <div class="sys-card-head"><h3>Historial de comprobantes</h3></div>
             <div class="table-wrap"><table>
               <thead><tr><th>Serie</th><th>Tipo</th><th>Fecha / Hora</th><th>Cliente / Descripción</th><th>Método Pago</th><th>Total</th><th>Reimprimir</th></tr></thead>
-              <tbody id="comprobantes-table"><tr><td colspan="7" class="empty-row">Cargando comprobantes...</td></tr></tbody>
+              <tbody id="comprobantes-table"><tr><td colspan="7" class="empty-row">Cargando...</td></tr></tbody>
             </table></div>
           </div>
         </section>
@@ -329,15 +344,14 @@
         <!-- ═══ CLIENTES ═══ -->
         <section id="sec-clientes" class="sys-section">
           <div class="sec-toolbar">
-            <input type="text" class="sys-input" id="search-cliente" placeholder="Buscar por nombre o DNI...">
+            <input type="text" class="sys-input" id="search-cliente" placeholder="🔍 Buscar por nombre o DNI...">
             <button class="sys-btn sys-btn-gold" id="btn-add-cliente">
-              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Nuevo cliente
+              <i class="fas fa-user-plus"></i> Nuevo cliente
             </button>
           </div>
           <div class="sys-card">
             <div class="table-wrap"><table>
-              <thead><tr><th>Nombre</th><th>DNI/Pasaporte</th><th>Teléfono</th><th>Email</th><th>Última estancia</th><th>Total visitas</th><th></th></tr></thead>
+              <thead><tr><th>Nombre</th><th>DNI/Pasaporte</th><th>Teléfono</th><th>Email</th><th>Última estancia</th><th>Visitas</th><th></th></tr></thead>
               <tbody id="clientes-table"><tr><td colspan="7" class="empty-row">Cargando clientes...</td></tr></tbody>
             </table></div>
           </div>
@@ -346,29 +360,25 @@
         <!-- ═══ USUARIOS ═══ -->
         <section id="sec-usuarios" class="sys-section">
           <div class="sec-toolbar">
-            <h2 style="font-size:15px;font-weight:700">Gestión de usuarios del sistema</h2>
+            <h2 style="font-size:15px;font-weight:700;color:var(--text-1)">Gestión de usuarios</h2>
             <button class="sys-btn sys-btn-gold" id="btn-add-user">
-              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Invitar usuario
+              <i class="fas fa-user-plus"></i> Nuevo usuario
             </button>
           </div>
           <div class="sys-card">
             <div class="table-wrap"><table>
-              <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead>
               <tbody id="users-table"><tr><td colspan="6" class="empty-row">Cargando usuarios...</td></tr></tbody>
             </table></div>
           </div>
         </section>
 
-      </div><!-- end sys-content -->
-    </div><!-- end sys-main -->
-  </div><!-- end dashboard -->
+      </div>
+    </div>
+  </div>
+</div>
 
-</div><!-- end sistema-app -->
-
-<!-- ══════════════════ MODALES ══════════════════ -->
-
-<!-- Modal habitación -->
+<!-- ═══ MODALES ═══ -->
 <div id="modal-habitacion" class="sys-modal" style="display:none">
   <div class="sys-modal-box">
     <div class="sys-modal-head">
@@ -382,16 +392,15 @@
   </div>
 </div>
 
-<!-- Modal check-in -->
 <div id="modal-checkin" class="sys-modal" style="display:none">
   <div class="sys-modal-box sys-modal-lg">
     <div class="sys-modal-head">
-      <h3>Check-in — Hab. <span id="ci-hab-num"></span></h3>
+      <h3><i class="fas fa-sign-in-alt" style="color:var(--success);margin-right:8px"></i>Check-in — Hab. <span id="ci-hab-num"></span></h3>
       <button class="modal-close" data-modal="modal-checkin">✕</button>
     </div>
     <div class="sys-modal-body">
       <div class="form-grid-2">
-        <div class="form-field"><label>Huésped principal (nombre completo)</label><input type="text" id="ci-nombre" class="sys-input" placeholder="Juan Pérez García"></div>
+        <div class="form-field"><label>Nombre completo</label><input type="text" id="ci-nombre" class="sys-input" placeholder="Juan Pérez García"></div>
         <div class="form-field"><label>DNI / Pasaporte</label><input type="text" id="ci-dni" class="sys-input" placeholder="12345678"></div>
         <div class="form-field"><label>Teléfono</label><input type="text" id="ci-tel" class="sys-input" placeholder="+51 999 999 999"></div>
         <div class="form-field"><label>Email (opcional)</label><input type="email" id="ci-email" class="sys-input" placeholder="correo@ejemplo.com"></div>
@@ -403,30 +412,28 @@
       </div>
       <div class="form-actions">
         <button class="sys-btn sys-btn-outline" data-modal="modal-checkin">Cancelar</button>
-        <button class="sys-btn sys-btn-gold" id="btn-confirmar-checkin">Confirmar Check-in</button>
+        <button class="sys-btn sys-btn-gold" id="btn-confirmar-checkin"><i class="fas fa-check"></i> Confirmar Check-in</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Modal checkout -->
 <div id="modal-checkout" class="sys-modal" style="display:none">
-  <div class="sys-modal-box">
+  <div class="sys-modal-box sys-modal-lg">
     <div class="sys-modal-head">
-      <h3>Check-out — Hab. <span id="co-hab-num"></span></h3>
+      <h3><i class="fas fa-sign-out-alt" style="color:var(--danger);margin-right:8px"></i>Check-out — Hab. <span id="co-hab-num"></span></h3>
       <button class="modal-close" data-modal="modal-checkout">✕</button>
     </div>
     <div class="sys-modal-body">
       <div class="checkout-summary" id="checkout-summary"></div>
       <div class="form-actions">
         <button class="sys-btn sys-btn-outline" data-modal="modal-checkout">Cancelar</button>
-        <button class="sys-btn sys-btn-gold" id="btn-confirmar-checkout">Confirmar Check-out</button>
+        <button class="sys-btn sys-btn-gold" id="btn-confirmar-checkout"><i class="fas fa-check"></i> Confirmar Check-out</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Modal producto -->
 <div id="modal-producto" class="sys-modal" style="display:none">
   <div class="sys-modal-box">
     <div class="sys-modal-head">
@@ -450,24 +457,20 @@
         <div class="form-field"><label>Stock mínimo (alerta)</label><input type="number" id="prod-stock-min" class="sys-input" placeholder="5"></div>
         <input type="hidden" id="prod-id">
       </div>
-      <!-- Stock actual (solo edición) -->
       <div id="stock-edit-section" style="display:none">
-        <div class="stock-divider">
-          <span>Stock actual: <strong id="prod-stock-actual">0</strong> unidades</span>
-        </div>
+        <div class="stock-divider"><span>Stock actual: <strong id="prod-stock-actual">0</strong> unidades</span></div>
         <div class="stock-ajuste-grid">
           <div class="form-field">
             <label>Ajuste de stock</label>
             <div class="stock-ajuste-controls">
               <button type="button" class="stock-op-btn" id="btn-stock-restar">−</button>
-              <input type="number" id="prod-stock-ajuste" class="sys-input" value="0" min="0" placeholder="0">
-              <button type="button" class="stock-op-btn btn-sumar" id="btn-stock-sumar">+</button>
+              <input type="number" id="prod-stock-ajuste" class="sys-input" value="0" min="0">
+              <button type="button" class="stock-op-btn" id="btn-stock-sumar">+</button>
             </div>
-            <small id="stock-resultado-preview" style="color:var(--text-light);font-size:11px;margin-top:4px;display:block"></small>
+            <small id="stock-resultado-preview" style="color:var(--text-3);font-size:11px;margin-top:4px;display:block"></small>
           </div>
         </div>
       </div>
-      <!-- Stock nuevo (solo creación) -->
       <div id="stock-nuevo-section">
         <div class="form-grid-2">
           <div class="form-field"><label>Stock inicial</label><input type="number" id="prod-stock" class="sys-input" placeholder="0"></div>
@@ -481,7 +484,6 @@
   </div>
 </div>
 
-<!-- Modal cliente -->
 <div id="modal-cliente" class="sys-modal" style="display:none">
   <div class="sys-modal-box">
     <div class="sys-modal-head">
@@ -505,7 +507,6 @@
   </div>
 </div>
 
-<!-- Modal usuario -->
 <div id="modal-usuario" class="sys-modal" style="display:none">
   <div class="sys-modal-box">
     <div class="sys-modal-head">
@@ -530,10 +531,8 @@
         </div>
         <input type="hidden" id="usr-id">
       </div>
-      <div style="background:#fdf9f2;padding:12px;border-radius:2px;font-size:12px;color:var(--text-mid);margin-bottom:8px">
-        <strong>ℹ️ Nota:</strong> Si el sistema no puede crear el usuario automáticamente, ve a 
-        <strong>Supabase → Authentication → Add user</strong>, crea el usuario con email y contraseña, 
-        luego edita su rol aquí.
+      <div style="background:var(--primary-light);padding:12px;border-radius:var(--radius-sm);font-size:12px;color:var(--primary);margin-bottom:8px;border-left:3px solid var(--primary)">
+        <strong>ℹ️ Nota:</strong> Si el sistema no puede crear el usuario, crea el auth user desde <strong>Supabase → Authentication → Add user</strong>, luego asigna el rol aquí.
       </div>
       <div class="form-actions">
         <button class="sys-btn sys-btn-outline" data-modal="modal-usuario">Cancelar</button>
@@ -543,17 +542,15 @@
   </div>
 </div>
 
-
-<!-- Modal pago venta pública -->
 <div id="modal-pago-pub" class="sys-modal" style="display:none">
   <div class="sys-modal-box">
     <div class="sys-modal-head">
-      <h3>Confirmar Venta</h3>
+      <h3><i class="fas fa-cash-register" style="color:var(--primary);margin-right:8px"></i>Confirmar Venta</h3>
       <button class="modal-close" data-modal="modal-pago-pub">✕</button>
     </div>
     <div class="sys-modal-body">
       <div id="pago-pub-items" class="checkout-summary"></div>
-      <div class="pago-section" style="margin-top:14px">
+      <div class="pago-section">
         <div class="form-field">
           <label>Método de pago</label>
           <div class="metodo-pago-grid">
@@ -573,16 +570,16 @@
       </div>
       <div class="form-actions">
         <button class="sys-btn sys-btn-outline" data-modal="modal-pago-pub">Cancelar</button>
-        <button class="sys-btn sys-btn-gold" id="btn-confirmar-pago-pub">Imprimir y confirmar</button>
+        <button class="sys-btn sys-btn-gold" id="btn-confirmar-pago-pub"><i class="fas fa-print"></i> Imprimir y confirmar</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Toast -->
 <div id="sys-toast" class="sys-toast" style="display:none"></div>
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/css/sistema.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="/js/sistema.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">

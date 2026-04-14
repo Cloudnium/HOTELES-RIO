@@ -1,5 +1,5 @@
 // ============================================================
-//  sistema.js — Sistema de Gestión Interna Hoteles Rio v4
+//  sistema.js — Sistema de Gestión Interna Hoteles Rio v5
 // ============================================================
 
 const SUPABASE_URL      = 'https://jyzteirrmjangptekmgm.supabase.co';
@@ -113,6 +113,7 @@ async function handleLogin(user) {
   // Recuperar caja activa del usuario
   await recuperarCajaActiva();
 
+  actualizarCajaStatus();
   showDashboard();
   loadSection('habitaciones');
 }
@@ -124,6 +125,19 @@ async function recuperarCajaActiva() {
     .select('*').eq('fecha', hoy).eq('estado', 'abierta')
     .eq('usuario_id', currentUserProfile.id);
   cajaActual = cajas?.[0] || null;
+}
+
+function actualizarCajaStatus() {
+  const el = document.getElementById('caja-status-topbar');
+  const txt = document.getElementById('caja-status-text');
+  if (!el || !txt) return;
+  if (cajaActual) {
+    el.className = 'caja-status-topbar abierta';
+    txt.textContent = `Caja abierta`;
+  } else {
+    el.className = 'caja-status-topbar cerrada';
+    txt.textContent = 'Sin caja abierta';
+  }
 }
 
 function rolLabel(r){ return {admin:'Administrador',recepcionista:'Recepcionista',cajero:'Cajero',limpieza:'Limpieza'}[r]||r; }
@@ -653,50 +667,144 @@ async function eliminarConsumo(id){
 }
 
 // ══════════════════════════════════════════════════════════
-//  TIENDA PÚBLICA
+//  TIENDA PÚBLICA — Catálogo + Carrito
 // ══════════════════════════════════════════════════════════
 async function loadTiendaPublica() {
   if(!requireCaja('vender en tienda')) return;
   carritoPublico={};
-  await loadProductsQuick('products-catalog',true);
+  await cargarCatalogoPub();
   await loadVentasHoy();
-  renderTotalPublico();
+  renderCarrito();
+
   const inp=document.getElementById('search-product-pub');
-  if(inp&&!inp._bound){
-    inp._bound=true;
-    inp.addEventListener('input',e=>{
-      const q=e.target.value.toLowerCase();
-      document.querySelectorAll('#products-catalog .product-quick-card').forEach(card=>{
-        card.style.display=card.querySelector('.pq-name')?.textContent.toLowerCase().includes(q)?'':'none';
-      });
+  const catSel=document.getElementById('filter-cat-pub');
+  const filtrar=()=>{
+    const q=(inp?.value||'').toLowerCase();
+    const cat=catSel?.value||'';
+    document.querySelectorAll('#products-catalog .prod-card').forEach(card=>{
+      const name=card.dataset.name||'';
+      const cardCat=card.dataset.cat||'';
+      const matchQ=!q||name.includes(q);
+      const matchC=!cat||cardCat===cat;
+      card.style.display=(matchQ&&matchC)?'':'none';
     });
-  }
+  };
+  if(inp&&!inp._bound){inp._bound=true;inp.addEventListener('input',filtrar);}
+  if(catSel&&!catSel._bound){catSel._bound=true;catSel.addEventListener('change',filtrar);}
+
   const btnN=document.getElementById('btn-nueva-venta-pub');
-  if(btnN){btnN.onclick=()=>{carritoPublico={};renderTotalPublico();document.querySelectorAll('.pq-carrito').forEach(el=>el.textContent='');showToast('Carrito limpiado','ok');};}
-  const btnC=document.getElementById('btn-confirmar-venta-pub');
-  if(btnC) btnC.onclick=abrirModalPagoPub;
+  if(btnN){btnN.onclick=()=>limpiarCarrito();}
+  const btnLimpiar=document.getElementById('btn-limpiar-carrito');
+  if(btnLimpiar){btnLimpiar.onclick=()=>limpiarCarrito();}
+  const btnConf=document.getElementById('btn-confirmar-venta-pub');
+  if(btnConf){btnConf.onclick=abrirModalPagoPub;}
 }
+
+function limpiarCarrito(){
+  carritoPublico={};
+  document.querySelectorAll('#products-catalog .prod-card').forEach(c=>{
+    c.classList.remove('in-cart');
+    const badge=c.querySelector('.prod-qty-badge');
+    if(badge) badge.textContent='0';
+  });
+  renderCarrito();
+}
+
+async function cargarCatalogoPub(){
+  const { data:prods } = await sb.from('productos').select('*').eq('activo',true).order('nombre');
+  const container=document.getElementById('products-catalog'); if(!container) return;
+  const EMOJIS={bebidas:'🥤',snacks:'🍿',higiene:'🧴',servicios:'🛎️',otros:'📦'};
+  container.innerHTML=prods?.length
+    ?prods.map(p=>`
+        <div class="prod-card ${p.stock<=0?'no-stock':''}"
+             data-name="${escStr((p.nombre||'').toLowerCase())}" data-cat="${p.categoria||''}"
+             onclick="${p.stock>0?`addToCarritoPub(${p.id},'${escStr(p.nombre)}',${p.precio_venta})`:''}">
+          <span class="prod-emoji">${EMOJIS[p.categoria]||'📦'}</span>
+          <div class="prod-name">${p.nombre}</div>
+          <div class="prod-price">S/. ${p.precio_venta?.toFixed(2)}</div>
+          <div class="prod-stock">${p.stock<=0?'Sin stock':'Stock: '+p.stock}</div>
+          <div class="prod-qty-badge" id="badge-${p.id}">0</div>
+        </div>`).join('')
+    :'<p style="padding:20px;color:var(--text-3)">No hay productos en almacén.</p>';
+  // Inicializar contador
+  const hoyCount=document.getElementById('ventas-hoy-count');
+  if(hoyCount){
+    const hoy=new Date().toISOString().split('T')[0];
+    const { count } = await sb.from('ventas_publicas').select('*',{count:'exact',head:true}).gte('created_at',hoy+'T00:00:00');
+    hoyCount.textContent=`${count||0} venta${(count||0)!==1?'s':''} hoy`;
+  }
+}
+
+function addToCarritoPub(prodId,nombre,precio){
+  if(!requireCaja('vender')) return;
+  if(!carritoPublico[prodId]) carritoPublico[prodId]={nombre,precio,cantidad:0};
+  carritoPublico[prodId].cantidad++;
+  const badge=document.getElementById(`badge-${prodId}`);
+  if(badge) badge.textContent=carritoPublico[prodId].cantidad;
+  const card=badge?.closest('.prod-card');
+  if(card) card.classList.add('in-cart');
+  renderCarrito();
+}
+
+function addToCarritoPublico(prodId,nombre,precio){ addToCarritoPub(prodId,nombre,precio); }
+
+function cambiarCantidad(prodId,delta){
+  if(!carritoPublico[prodId]) return;
+  carritoPublico[prodId].cantidad=Math.max(0,carritoPublico[prodId].cantidad+delta);
+  const badge=document.getElementById(`badge-${prodId}`);
+  if(badge) badge.textContent=carritoPublico[prodId].cantidad;
+  const card=badge?.closest('.prod-card');
+  if(carritoPublico[prodId].cantidad===0){
+    delete carritoPublico[prodId];
+    if(card) card.classList.remove('in-cart');
+  } else if(card) card.classList.add('in-cart');
+  renderCarrito();
+}
+
+function renderCarrito(){
+  const items=Object.entries(carritoPublico).filter(([,i])=>i.cantidad>0);
+  const total=items.reduce((s,[,i])=>s+i.precio*i.cantidad,0);
+  const count=items.reduce((s,[,i])=>s+i.cantidad,0);
+
+  const cBadge=document.getElementById('carrito-count');
+  if(cBadge) cBadge.textContent=count;
+  const cTotal=document.getElementById('carrito-total');
+  if(cTotal) cTotal.textContent=`S/. ${total.toFixed(2)}`;
+
+  const cItems=document.getElementById('carrito-items'); if(!cItems) return;
+  if(!items.length){
+    cItems.innerHTML=`<div class="carrito-empty"><i class="fas fa-shopping-basket"></i><p style="font-size:13px;font-weight:500;color:var(--text-2)">Carrito vacío</p><p style="font-size:11px;color:var(--text-3);margin-top:4px">Haz clic en un producto</p></div>`;
+    return;
+  }
+  cItems.innerHTML=items.map(([id,i])=>`
+    <div class="carrito-item">
+      <div class="carrito-item-info">
+        <div class="carrito-item-name">${i.nombre}</div>
+        <div class="carrito-item-price">S/. ${i.precio.toFixed(2)} c/u — <strong>S/. ${(i.precio*i.cantidad).toFixed(2)}</strong></div>
+      </div>
+      <div class="carrito-item-controls">
+        <button class="qty-btn" onclick="cambiarCantidad(${id},-1)">−</button>
+        <span class="qty-num">${i.cantidad}</span>
+        <button class="qty-btn" onclick="cambiarCantidad(${id},+1)">+</button>
+      </div>
+    </div>`).join('');
+}
+
 async function loadVentasHoy() {
   const hoy=new Date().toISOString().split('T')[0];
   const { data:ventas } = await sb.from('ventas_publicas').select('*, usuarios(nombre)').gte('created_at',hoy+'T00:00:00').order('created_at',{ascending:false});
   const tbody=document.getElementById('ventas-pub-list'); if(!tbody) return;
   tbody.innerHTML=ventas?.length?ventas.map(v=>`<tr><td>${formatTime(v.created_at)}</td><td>${v.detalle||'—'}</td><td>S/. ${v.total?.toFixed(2)}</td><td>${v.usuarios?.nombre||'—'}</td></tr>`).join(''):'<tr><td colspan="4" class="empty-row">Sin ventas hoy</td></tr>';
 }
+
 function renderTotalPublico(){
   const total=Object.values(carritoPublico).reduce((s,i)=>s+i.precio*i.cantidad,0);
   const el=document.getElementById('total-pub-display'); if(el) el.textContent=`S/. ${total.toFixed(2)}`;
 }
-function addToCarritoPublico(prodId,nombre,precio){
-  if(!requireCaja('vender')) return;
-  if(!carritoPublico[prodId]) carritoPublico[prodId]={nombre,precio,cantidad:0};
-  carritoPublico[prodId].cantidad++;
-  const el=document.getElementById(`carrito-${prodId}`); if(el) el.textContent=`× ${carritoPublico[prodId].cantidad}`;
-  renderTotalPublico();
-}
 function abrirModalPagoPub(){
   if(!requireCaja('confirmar venta')) return;
   const items=Object.entries(carritoPublico).filter(([,i])=>i.cantidad>0);
-  if(!items.length){showToast('Agrega productos primero','err');return;}
+  if(!items.length){showToast('Agrega productos al carrito primero','err');return;}
   const total=items.reduce((s,[,i])=>s+i.precio*i.cantidad,0);
   const modal=document.getElementById('modal-pago-pub'); if(!modal) return;
   document.getElementById('pago-pub-items').innerHTML=
@@ -730,7 +838,7 @@ async function procesarVentaPublica(items,total,metodoPago,vuelto){
   const datosTicket={serie,items,total,metodoPago,vuelto,cajero,caja:cajaNombre,fecha:new Date().toISOString()};
   await registrarComprobante({serie,tipo:'PUB',descripcion:detalle,cliente:'Cliente General',total,metodo_pago:metodoPago,datos_json:datosTicket,venta_publica_id:venta?.id});
   imprimirTicketTienda(datosTicket);
-  carritoPublico={}; renderTotalPublico(); document.querySelectorAll('.pq-carrito').forEach(el=>el.textContent='');
+  carritoPublico={}; renderCarrito(); document.querySelectorAll('[id^="badge-"]').forEach(el=>{el.textContent='0';}); document.querySelectorAll('.prod-card').forEach(c=>c.classList.remove('in-cart'));
   showToast(`✅ Venta S/. ${total.toFixed(2)} registrada`,'ok'); await loadVentasHoy();
 }
 
@@ -923,12 +1031,12 @@ async function abrirCaja(){
   if(cajaActual){showToast('Ya tienes una caja abierta','err');return;}
   const hoy=new Date().toISOString().split('T')[0];
   const { data } = await sb.from('cajas').insert({usuario_id:currentUserProfile?.id,fecha:hoy,estado:'abierta',total:0}).select().single();
-  cajaActual=data; showToast('✅ Caja abierta','ok'); loadCajas();
+  cajaActual=data; actualizarCajaStatus(); showToast('✅ Caja abierta','ok'); loadCajas();
 }
 async function cerrarCaja(id){
   await sb.from('cajas').update({estado:'cerrada'}).eq('id',id);
   if(cajaActual?.id===id) cajaActual=null;
-  showToast('Caja cerrada ✓','ok'); loadCajas();
+  actualizarCajaStatus(); showToast('Caja cerrada ✓','ok'); loadCajas();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -937,10 +1045,15 @@ async function cerrarCaja(id){
 function initReportes(){
   const hoy=new Date();
   const primer=new Date(hoy.getFullYear(),hoy.getMonth(),1).toISOString().split('T')[0];
-  document.getElementById('reporte-desde').value=primer;
-  document.getElementById('reporte-hasta').value=hoy.toISOString().split('T')[0];
-  const btn=document.getElementById('btn-generar-reporte');
-  if(btn&&!btn._bound){btn._bound=true;btn.addEventListener('click',generarReporte);}
+  const desdEl=document.getElementById('reporte-desde');
+  const hastaEl=document.getElementById('reporte-hasta');
+  if(desdEl) desdEl.value=primer;
+  if(hastaEl) hastaEl.value=hoy.toISOString().split('T')[0];
+  // Auto-generar al cambiar fechas
+  if(desdEl&&!desdEl._bound){desdEl._bound=true;desdEl.addEventListener('change',()=>{if(document.getElementById('reporte-hasta').value)generarReporte();});}
+  if(hastaEl&&!hastaEl._bound){hastaEl._bound=true;hastaEl.addEventListener('change',()=>{if(document.getElementById('reporte-desde').value)generarReporte();});}
+  // Generar inmediatamente con el mes actual
+  generarReporte();
 }
 async function generarReporte(){
   const desde=document.getElementById('reporte-desde').value;
