@@ -228,3 +228,66 @@ CREATE TRIGGER trg_create_profile
 AFTER INSERT ON auth.users
 FOR EACH ROW EXECUTE FUNCTION fn_create_user_profile();
 
+
+-- ══════════════════════════════════════════════════════════════
+--  ACTUALIZACIONES v2 — Ejecuta estas líneas si ya tenías el schema
+-- ══════════════════════════════════════════════════════════════
+
+-- Agregar columna metodo_pago a check_ins
+ALTER TABLE check_ins ADD COLUMN IF NOT EXISTS metodo_pago TEXT DEFAULT 'Efectivo';
+
+-- Agregar columna metodo_pago a ventas_publicas
+ALTER TABLE ventas_publicas ADD COLUMN IF NOT EXISTS metodo_pago TEXT DEFAULT 'Efectivo';
+
+-- Agregar columna lineas_json a ventas_publicas (para desglose por producto en reportes)
+ALTER TABLE ventas_publicas ADD COLUMN IF NOT EXISTS lineas_json TEXT;
+
+
+-- ══════════════════════════════════════════════════════════════
+--  ACTUALIZACIONES v3 — Tabla comprobantes + columna serie en check_ins
+-- ══════════════════════════════════════════════════════════════
+
+-- Tabla de comprobantes (tickets emitidos)
+CREATE TABLE IF NOT EXISTS comprobantes (
+  id                BIGSERIAL PRIMARY KEY,
+  serie             TEXT NOT NULL UNIQUE,       -- T001-00000001 / T002-00000001
+  tipo_serie        TEXT NOT NULL CHECK (tipo_serie IN ('HAB','PUB')),
+  descripcion       TEXT,
+  cliente           TEXT,
+  total             NUMERIC(10,2) NOT NULL,
+  metodo_pago       TEXT DEFAULT 'Efectivo',
+  datos_json        TEXT,                        -- JSON con todos los datos para reimprimir
+  check_in_id       BIGINT REFERENCES check_ins(id),
+  venta_publica_id  BIGINT REFERENCES ventas_publicas(id),
+  usuario_id        BIGINT REFERENCES usuarios(id),
+  caja_id           BIGINT REFERENCES cajas(id),
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Habilitar RLS
+ALTER TABLE comprobantes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "auth_users_only" ON comprobantes FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Columna serie en check_ins para mostrar en reportes
+ALTER TABLE check_ins ADD COLUMN IF NOT EXISTS serie_comprobante TEXT;
+
+-- Columna metodo_pago (por si no existe)
+ALTER TABLE check_ins ADD COLUMN IF NOT EXISTS metodo_pago TEXT DEFAULT 'Efectivo';
+ALTER TABLE ventas_publicas ADD COLUMN IF NOT EXISTS metodo_pago TEXT DEFAULT 'Efectivo';
+ALTER TABLE ventas_publicas ADD COLUMN IF NOT EXISTS lineas_json TEXT;
+
+
+-- ══════════════════════════════════════════════════════════
+--  ACTUALIZACIONES v4
+-- ══════════════════════════════════════════════════════════
+
+-- Tipo CAJA para comprobantes
+ALTER TABLE comprobantes DROP CONSTRAINT IF EXISTS comprobantes_tipo_serie_check;
+ALTER TABLE comprobantes ADD CONSTRAINT comprobantes_tipo_serie_check
+  CHECK (tipo_serie IN ('HAB','PUB','CAJA'));
+
+-- Categorías correctas en habitaciones (si necesitas actualizar)
+-- UPDATE habitaciones SET categoria = 'economico' WHERE categoria = 'individual' OR categoria = 'doble';
+-- UPDATE habitaciones SET categoria = 'premium' WHERE categoria = 'matrimonial';
+-- (La categoría suite se mantiene igual)
+
