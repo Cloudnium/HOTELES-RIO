@@ -341,3 +341,28 @@ tr:hover td { background: #fdf9f2; }
   .form-grid-2 { grid-template-columns: 1fr; }
   .rooms-grid-sys { grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); }
 }
+
+/* ── Método de pago ─────────────────────────────────────── */
+.pago-section { margin-top: 14px; }
+.metodo-pago-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px;
+}
+.metodo-btn {
+  padding: 10px 6px; border: 1.5px solid var(--cream-dark); border-radius: 2px;
+  background: var(--white); font-family: var(--font-body); font-size: 12px;
+  cursor: pointer; transition: var(--transition); text-align: center; color: var(--text-dark);
+}
+.metodo-btn:hover { border-color: var(--gold); background: #fdf9f2; }
+.metodo-btn.active { background: var(--charcoal); color: var(--gold); border-color: var(--charcoal); font-weight: 500; }
+
+/* ── Efectivo/Vuelto ────────────────────────────────────── */
+.efectivo-section { margin-top: 12px; padding: 12px; background: #faf8f4; border-radius: 2px; }
+.vuelto-display {
+  margin-top: 8px; font-size: 14px; color: var(--text-mid); font-family: var(--font-display);
+  display: flex; align-items: center; gap: 8px;
+}
+.vuelto-display strong { font-size: 20px; color: var(--gold); }
+
+/* ── Checkout total row ─────────────────────────────────── */
+.checkout-total { font-weight: 700; font-size: 15px; font-family: var(--font-display); }
+.checkout-total span:last-child { color: var(--gold); font-size: 18px; }

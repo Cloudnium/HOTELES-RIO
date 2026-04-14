@@ -454,13 +454,17 @@
 <div id="modal-usuario" class="sys-modal" style="display:none">
   <div class="sys-modal-box">
     <div class="sys-modal-head">
-      <h3>Gestionar usuario</h3>
+      <h3 id="modal-usuario-title">Gestionar usuario</h3>
       <button class="modal-close" data-modal="modal-usuario">✕</button>
     </div>
     <div class="sys-modal-body">
       <div class="form-grid-2">
         <div class="form-field"><label>Nombre completo</label><input type="text" id="usr-nombre" class="sys-input"></div>
         <div class="form-field"><label>Email</label><input type="email" id="usr-email" class="sys-input"></div>
+        <div class="form-field" id="usr-password-group">
+          <label>Contraseña (mín. 6 caracteres)</label>
+          <input type="password" id="usr-password" class="sys-input" placeholder="••••••••">
+        </div>
         <div class="form-field"><label>Rol / Cargo</label>
           <select id="usr-rol" class="sys-select">
             <option value="admin">Administrador</option>
@@ -471,9 +475,50 @@
         </div>
         <input type="hidden" id="usr-id">
       </div>
+      <div style="background:#fdf9f2;padding:12px;border-radius:2px;font-size:12px;color:var(--text-mid);margin-bottom:8px">
+        <strong>ℹ️ Nota:</strong> Si el sistema no puede crear el usuario automáticamente, ve a 
+        <strong>Supabase → Authentication → Add user</strong>, crea el usuario con email y contraseña, 
+        luego edita su rol aquí.
+      </div>
       <div class="form-actions">
         <button class="sys-btn sys-btn-outline" data-modal="modal-usuario">Cancelar</button>
-        <button class="sys-btn sys-btn-gold" id="btn-guardar-usuario">Guardar cambios</button>
+        <button class="sys-btn sys-btn-gold" id="btn-guardar-usuario">Guardar usuario</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modal pago venta pública -->
+<div id="modal-pago-pub" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head">
+      <h3>Confirmar Venta</h3>
+      <button class="modal-close" data-modal="modal-pago-pub">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <div id="pago-pub-items" class="checkout-summary"></div>
+      <div class="pago-section" style="margin-top:14px">
+        <div class="form-field">
+          <label>Método de pago</label>
+          <div class="metodo-pago-grid">
+            <button class="metodo-btn active" data-metodo="Efectivo">💵 Efectivo</button>
+            <button class="metodo-btn" data-metodo="Tarjeta">💳 Tarjeta</button>
+            <button class="metodo-btn" data-metodo="Yape">📱 Yape</button>
+            <button class="metodo-btn" data-metodo="Plin">📱 Plin</button>
+          </div>
+        </div>
+        <div id="efectivo-pub-section" class="efectivo-section">
+          <div class="form-field">
+            <label>Efectivo recibido (S/.)</label>
+            <input type="number" id="efectivo-pub-recibido" class="sys-input" placeholder="0.00" step="0.01">
+          </div>
+          <div class="vuelto-display">Vuelto: <strong id="vuelto-pub">S/. 0.00</strong></div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="sys-btn sys-btn-outline" data-modal="modal-pago-pub">Cancelar</button>
+        <button class="sys-btn sys-btn-gold" id="btn-confirmar-pago-pub">Imprimir y confirmar</button>
       </div>
     </div>
   </div>
