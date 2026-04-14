@@ -2,8 +2,8 @@
 //  sistema.js — Sistema de Gestión Interna Hoteles Rio v4
 // ============================================================
 
-const SUPABASE_URL      = 'https://TU_PROYECTO.supabase.co';
-const SUPABASE_ANON_KEY = 'TU_ANON_KEY_AQUI';
+const SUPABASE_URL      = 'https://jyzteirrmjangptekmgm.supabase.co';
+const SUPABASE_ANON_KEY = 'TeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5enRlaXJybWphbmdwdGVrbWdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMjExNTYsImV4cCI6MjA5MTY5NzE1Nn0.Qc85njSX6BE15i3w8WN2SJ8t1vYzAzPDrP_9FRkQQCk';
 
 const { createClient } = supabase;
 // persistSession:true garantiza que la sesión sobrevive cambios de pestaña/ventana
