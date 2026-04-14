@@ -257,7 +257,7 @@ function renderRoomsGrid(rooms) {
         </div>
         <div class="cat-rooms-grid">
           ${lista.map(r=>`
-            <div class="room-card-sys" onclick="openRoomModal(${r.id})">
+            <div class="room-card-sys status-${r.estado || 'disponible'}" onclick="openRoomModal(${r.id})">
               <div class="room-card-top">
                 <div>
                   <div class="room-card-num">NRO: ${String(r.numero).padStart(3,'0')}</div>
@@ -276,7 +276,15 @@ function renderRoomsGrid(rooms) {
   grid.innerHTML = html;
 }
 
-function roomIcon(e){ return {disponible:'🛏️',ocupado:'🔴',limpieza:'🧹',mantenimiento:'🔧',reservado:'📋'}[e]||'🛏️'; }
+function roomIcon(e){
+  return {
+    disponible:'<i class="fas fa-bed"></i>',
+    ocupado:'<i class="fas fa-user-lock"></i>',
+    limpieza:'<i class="fas fa-broom"></i>',
+    mantenimiento:'<i class="fas fa-tools"></i>',
+    reservado:'<i class="fas fa-calendar-check"></i>'
+  }[e] || '<i class="fas fa-bed"></i>';
+}
 
 async function openRoomModal(id) {
   const { data:room } = await sb.from('habitaciones').select('*').eq('id',id).single();
