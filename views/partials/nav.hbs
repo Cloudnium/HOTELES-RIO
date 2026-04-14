@@ -1,29 +1,9 @@
 <nav class="navbar" id="navbar">
   <div class="nav-container">
-
-    <!-- ============================================================
-      LOGO — Tienes DOS opciones:
-      OPCIÓN A (imagen): Descomenta la línea img y comenta el texto
-      OPCIÓN B (texto): Deja el bloque .logo-text activo
-      Coloca tu logo en: public/images/logos/logo.png
-                         public/images/logos/logo-white.png (versión blanca)
-    ============================================================ -->
     <a href="/" class="logo">
-      <!-- OPCIÓN A — Logo imagen: descomenta para usar -->
       <img src="/images/logos/logo.png" alt="Hoteles Rio" class="logo-img" id="logoImg">
+    </a>
 
-      <!-- OPCIÓN B — Logo texto: comenta esto si usas imagen -->
-      <!-- <div class="logo-icon">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3 21V9L12 3L21 9V21H15V15H9V21H3Z"/>
-        </svg>
-      </div>
-      <div class="logo-text">
-        Hoteles <span>Rio</span>
-      </div>
-    </a> -->
-
-    <!-- Menú desktop -->
     <ul class="nav-links">
       <li><a href="/"             class="nav-link {{#eq page 'inicio'}}active{{/eq}}">Inicio</a></li>
       <li><a href="/habitaciones" class="nav-link {{#eq page 'habitaciones'}}active{{/eq}}">Habitaciones</a></li>
@@ -32,16 +12,19 @@
       <li><a href="/contacto"     class="nav-link {{#eq page 'contacto'}}active{{/eq}}">Contacto</a></li>
     </ul>
 
-    <!-- Botón CTA nav -->
-    <a href="/reservas" class="btn-nav-cta">Reservar ahora</a>
+    <div class="nav-right">
+      <a href="/reservas" class="btn-nav-cta">Reservar ahora</a>
+      <a href="/sistema" class="btn-nav-sistema" title="Acceso trabajadores">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Personal
+      </a>
+    </div>
 
-    <!-- Hamburger mobile -->
     <button class="hamburger" id="hamburger" aria-label="Abrir menú">
       <span></span><span></span><span></span>
     </button>
   </div>
 
-  <!-- Menú mobile -->
   <div class="mobile-menu" id="mobileMenu">
     <ul>
       <li><a href="/"             class="{{#eq page 'inicio'}}active{{/eq}}">Inicio</a></li>
@@ -49,6 +32,7 @@
       <li><a href="/galeria"      class="{{#eq page 'galeria'}}active{{/eq}}">Galería</a></li>
       <li><a href="/reservas"     class="{{#eq page 'reservas'}}active{{/eq}}">Reservas</a></li>
       <li><a href="/contacto"     class="{{#eq page 'contacto'}}active{{/eq}}">Contacto</a></li>
+      <li><a href="/sistema"      class="{{#eq page 'sistema'}}active{{/eq}}">Sistema Personal</a></li>
     </ul>
     <a href="/reservas" class="btn-mobile-cta">Reservar ahora</a>
   </div>

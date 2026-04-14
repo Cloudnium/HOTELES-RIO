@@ -1,0 +1,487 @@
+<!-- Sistema de Gestión Hotelera - Hoteles Rio -->
+<div id="sistema-app">
+
+  <!-- ══════════════════ LOGIN SCREEN ══════════════════ -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-overlay"></div>
+    <div class="login-card">
+      <div class="login-brand">
+        <img src="/images/logos/logo.png" alt="Hoteles Rio" class="login-logo-img">
+        <h2>Sistema de Gestión</h2>
+        <p>Acceso exclusivo para personal autorizado</p>
+      </div>
+      <div class="login-form">
+        <div class="login-field">
+          <label>Correo electrónico</label>
+          <div class="input-icon-wrap">
+            <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <input type="email" id="login-email" placeholder="tu@hotelrio.com" autocomplete="email">
+          </div>
+        </div>
+        <div class="login-field">
+          <label>Contraseña</label>
+          <div class="input-icon-wrap">
+            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+          </div>
+        </div>
+        <div id="login-error" class="login-error" style="display:none"></div>
+        <button id="login-btn" class="login-submit">
+          <span id="login-btn-text">Ingresar al Sistema</span>
+          <svg id="login-spinner" viewBox="0 0 24 24" style="display:none" class="spin"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="32"/></svg>
+        </button>
+      </div>
+      <div class="login-footer-note">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Conexión segura — Solo personal autorizado
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ DASHBOARD ══════════════════ -->
+  <div id="dashboard" class="dashboard" style="display:none">
+
+    <!-- Sidebar -->
+    <aside class="sys-sidebar" id="sys-sidebar">
+      <div class="sys-brand">
+        <div class="sys-brand-icon">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <div>
+          <span class="sys-brand-name">Hoteles Rio</span>
+          <span class="sys-brand-sub">Sistema Interno</span>
+        </div>
+      </div>
+
+      <nav class="sys-nav">
+        <div class="sys-nav-group">PRINCIPAL</div>
+        <a class="sys-nav-item active" data-sec="habitaciones">
+          <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          Habitaciones
+        </a>
+        <a class="sys-nav-item" data-sec="tienda-hab">
+          <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          Tienda x Habitación
+        </a>
+        <a class="sys-nav-item" data-sec="tienda-publica">
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Tienda Pública
+        </a>
+
+        <div class="sys-nav-group">INVENTARIO</div>
+        <a class="sys-nav-item" data-sec="almacen">
+          <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          Almacén
+        </a>
+
+        <div class="sys-nav-group">FINANZAS</div>
+        <a class="sys-nav-item" data-sec="cajas">
+          <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          Cajas del Día
+        </a>
+        <a class="sys-nav-item" data-sec="reportes">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Reportes
+        </a>
+
+        <div class="sys-nav-group">ADMINISTRACIÓN</div>
+        <a class="sys-nav-item" data-sec="clientes">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Clientes
+        </a>
+        <a class="sys-nav-item" data-sec="usuarios">
+          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Usuarios
+        </a>
+      </nav>
+
+      <div class="sys-user-card">
+        <div class="sys-avatar" id="sys-avatar">U</div>
+        <div class="sys-user-info">
+          <span id="sys-user-name">Usuario</span>
+          <small id="sys-user-role">—</small>
+        </div>
+        <button class="sys-logout" id="sys-logout" title="Cerrar sesión">
+          <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <div class="sys-main">
+      <header class="sys-topbar">
+        <div class="sys-topbar-left">
+          <button class="sys-menu-toggle" id="sys-menu-toggle">
+            <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <h1 id="sys-section-title">Habitaciones</h1>
+        </div>
+        <div class="sys-topbar-right">
+          <span id="sys-date-badge" class="sys-date-badge"></span>
+        </div>
+      </header>
+
+      <div class="sys-content">
+
+        <!-- ═══ HABITACIONES ═══ -->
+        <section id="sec-habitaciones" class="sys-section active">
+          <div class="sec-toolbar">
+            <div class="sec-toolbar-left">
+              <select id="filter-piso" class="sys-select">
+                <option value="">Todos los pisos</option>
+                <option value="1">Piso 1</option>
+                <option value="2">Piso 2</option>
+                <option value="3">Piso 3</option>
+              </select>
+              <select id="filter-estado" class="sys-select">
+                <option value="">Todos los estados</option>
+                <option value="disponible">Disponible</option>
+                <option value="ocupado">Ocupado</option>
+                <option value="limpieza">Limpieza</option>
+                <option value="mantenimiento">Mantenimiento</option>
+                <option value="reservado">Reservado</option>
+              </select>
+            </div>
+            <div class="sec-toolbar-right">
+              <div class="legend-dots">
+                <span class="dot dot-verde"></span>Disponible
+                <span class="dot dot-rojo"></span>Ocupado
+                <span class="dot dot-celeste"></span>Limpieza
+                <span class="dot dot-amarillo"></span>Mantenimiento
+                <span class="dot dot-naranja"></span>Reservado
+              </div>
+            </div>
+          </div>
+          <div id="rooms-grid" class="rooms-grid-sys"></div>
+        </section>
+
+        <!-- ═══ TIENDA x HABITACIÓN ═══ -->
+        <section id="sec-tienda-hab" class="sys-section">
+          <div class="sec-toolbar">
+            <select id="sel-hab-tienda" class="sys-select">
+              <option value="">Seleccionar habitación ocupada...</option>
+            </select>
+            <button class="sys-btn sys-btn-gold" id="btn-nueva-venta-hab">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Agregar consumo
+            </button>
+          </div>
+          <div class="two-col-layout">
+            <div class="sys-card">
+              <div class="sys-card-head"><h3>Consumos de la habitación</h3></div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Hora</th><th></th></tr></thead>
+                <tbody id="consumos-hab-list"><tr><td colspan="6" class="empty-row">Selecciona una habitación ocupada</td></tr></tbody>
+              </table></div>
+              <div class="sys-card-foot">
+                <span>Total habitación:</span>
+                <strong id="total-consumos-hab">S/. 0.00</strong>
+                <button class="sys-btn sys-btn-gold" id="btn-cobrar-habitacion" style="margin-left:auto">Registrar en Check-out</button>
+              </div>
+            </div>
+            <div class="sys-card">
+              <div class="sys-card-head"><h3>Productos disponibles</h3></div>
+              <div class="products-quick-grid" id="products-quick"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ TIENDA PÚBLICA ═══ -->
+        <section id="sec-tienda-publica" class="sys-section">
+          <div class="sec-toolbar">
+            <input type="text" class="sys-input" id="search-product-pub" placeholder="Buscar producto...">
+            <button class="sys-btn sys-btn-gold" id="btn-nueva-venta-pub">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nueva venta
+            </button>
+          </div>
+          <div class="two-col-layout">
+            <div class="sys-card">
+              <div class="sys-card-head"><h3>Ventas de hoy</h3></div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>Hora</th><th>Productos</th><th>Total</th><th>Cajero</th></tr></thead>
+                <tbody id="ventas-pub-list"><tr><td colspan="4" class="empty-row">Sin ventas hoy</td></tr></tbody>
+              </table></div>
+            </div>
+            <div class="sys-card">
+              <div class="sys-card-head"><h3>Catálogo de productos</h3><span id="total-venta-pub" class="total-badge">S/. 0.00</span></div>
+              <div class="products-quick-grid" id="products-catalog"></div>
+              <div class="sys-card-foot">
+                <span>Total a cobrar:</span>
+                <strong id="total-pub-display">S/. 0.00</strong>
+                <button class="sys-btn sys-btn-gold" id="btn-confirmar-venta-pub" style="margin-left:auto">Confirmar venta</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ ALMACÉN ═══ -->
+        <section id="sec-almacen" class="sys-section">
+          <div class="sec-toolbar">
+            <h2 style="font-size:15px;font-weight:700">Inventario de productos</h2>
+            <button class="sys-btn sys-btn-gold" id="btn-add-product">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nuevo producto
+            </button>
+          </div>
+          <div class="stats-row-sys" id="almacen-stats"></div>
+          <div class="sys-card">
+            <div class="table-wrap"><table>
+              <thead><tr><th>Código</th><th>Producto</th><th>Categoría</th><th>Precio Compra</th><th>Precio Venta</th><th>Stock</th><th>Alerta mínima</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="products-table"><tr><td colspan="9" class="empty-row">Cargando productos...</td></tr></tbody>
+            </table></div>
+          </div>
+        </section>
+
+        <!-- ═══ CAJAS ═══ -->
+        <section id="sec-cajas" class="sys-section">
+          <div class="sec-toolbar">
+            <h2 style="font-size:15px;font-weight:700">Cajas del día — <span id="caja-fecha"></span></h2>
+            <button class="sys-btn sys-btn-gold" id="btn-abrir-caja">
+              <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              Abrir mi caja
+            </button>
+          </div>
+          <div id="cajas-grid" class="cajas-grid"></div>
+          <div class="sys-card" style="margin-top:20px">
+            <div class="sys-card-head"><h3>Movimientos de mi caja hoy</h3></div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Hora</th><th>Concepto</th><th>Tipo</th><th>Monto</th></tr></thead>
+              <tbody id="caja-movimientos"><tr><td colspan="4" class="empty-row">Sin movimientos</td></tr></tbody>
+            </table></div>
+          </div>
+        </section>
+
+        <!-- ═══ REPORTES ═══ -->
+        <section id="sec-reportes" class="sys-section">
+          <div class="sec-toolbar">
+            <div class="date-filter-group">
+              <label>Desde</label>
+              <input type="date" class="sys-input" id="reporte-desde">
+              <label>Hasta</label>
+              <input type="date" class="sys-input" id="reporte-hasta">
+              <button class="sys-btn sys-btn-gold" id="btn-generar-reporte">
+                <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Generar reporte
+              </button>
+            </div>
+          </div>
+          <div class="stats-row-sys" id="reporte-stats"></div>
+          <div class="two-col-layout">
+            <div class="sys-card">
+              <div class="sys-card-head"><h3>Ingresos por habitaciones</h3></div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>Habitación</th><th>Noches</th><th>Total</th></tr></thead>
+                <tbody id="reporte-habitaciones"><tr><td colspan="3" class="empty-row">Genera un reporte para ver datos</td></tr></tbody>
+              </table></div>
+            </div>
+            <div class="sys-card">
+              <div class="sys-card-head"><h3>Ingresos por ventas</h3></div>
+              <div class="table-wrap"><table>
+                <thead><tr><th>Producto</th><th>Cantidad</th><th>Total</th></tr></thead>
+                <tbody id="reporte-ventas"><tr><td colspan="3" class="empty-row">Genera un reporte para ver datos</td></tr></tbody>
+              </table></div>
+            </div>
+          </div>
+          <div class="sys-card" style="margin-top:20px">
+            <div class="sys-card-head"><h3>Detalle de Check-ins / Check-outs</h3></div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Hab.</th><th>Cliente</th><th>Check-in</th><th>Check-out</th><th>Noches</th><th>Habitación</th><th>Consumos</th><th>Total</th></tr></thead>
+              <tbody id="reporte-checkins"><tr><td colspan="8" class="empty-row">Genera un reporte para ver datos</td></tr></tbody>
+            </table></div>
+          </div>
+        </section>
+
+        <!-- ═══ CLIENTES ═══ -->
+        <section id="sec-clientes" class="sys-section">
+          <div class="sec-toolbar">
+            <input type="text" class="sys-input" id="search-cliente" placeholder="Buscar por nombre o DNI...">
+            <button class="sys-btn sys-btn-gold" id="btn-add-cliente">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nuevo cliente
+            </button>
+          </div>
+          <div class="sys-card">
+            <div class="table-wrap"><table>
+              <thead><tr><th>Nombre</th><th>DNI/Pasaporte</th><th>Teléfono</th><th>Email</th><th>Última estancia</th><th>Total visitas</th><th></th></tr></thead>
+              <tbody id="clientes-table"><tr><td colspan="7" class="empty-row">Cargando clientes...</td></tr></tbody>
+            </table></div>
+          </div>
+        </section>
+
+        <!-- ═══ USUARIOS ═══ -->
+        <section id="sec-usuarios" class="sys-section">
+          <div class="sec-toolbar">
+            <h2 style="font-size:15px;font-weight:700">Gestión de usuarios del sistema</h2>
+            <button class="sys-btn sys-btn-gold" id="btn-add-user">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Invitar usuario
+            </button>
+          </div>
+          <div class="sys-card">
+            <div class="table-wrap"><table>
+              <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead>
+              <tbody id="users-table"><tr><td colspan="6" class="empty-row">Cargando usuarios...</td></tr></tbody>
+            </table></div>
+          </div>
+        </section>
+
+      </div><!-- end sys-content -->
+    </div><!-- end sys-main -->
+  </div><!-- end dashboard -->
+
+</div><!-- end sistema-app -->
+
+<!-- ══════════════════ MODALES ══════════════════ -->
+
+<!-- Modal habitación -->
+<div id="modal-habitacion" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head">
+      <h3 id="modal-hab-title">Habitación</h3>
+      <button class="modal-close" data-modal="modal-habitacion">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <div class="modal-hab-info" id="modal-hab-info"></div>
+      <div class="modal-actions" id="modal-hab-actions"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal check-in -->
+<div id="modal-checkin" class="sys-modal" style="display:none">
+  <div class="sys-modal-box sys-modal-lg">
+    <div class="sys-modal-head">
+      <h3>Check-in — Hab. <span id="ci-hab-num"></span></h3>
+      <button class="modal-close" data-modal="modal-checkin">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <div class="form-grid-2">
+        <div class="form-field"><label>Huésped principal (nombre completo)</label><input type="text" id="ci-nombre" class="sys-input" placeholder="Juan Pérez García"></div>
+        <div class="form-field"><label>DNI / Pasaporte</label><input type="text" id="ci-dni" class="sys-input" placeholder="12345678"></div>
+        <div class="form-field"><label>Teléfono</label><input type="text" id="ci-tel" class="sys-input" placeholder="+51 999 999 999"></div>
+        <div class="form-field"><label>Email (opcional)</label><input type="email" id="ci-email" class="sys-input" placeholder="correo@ejemplo.com"></div>
+        <div class="form-field"><label>Fecha de ingreso</label><input type="date" id="ci-entrada" class="sys-input"></div>
+        <div class="form-field"><label>Fecha estimada de salida</label><input type="date" id="ci-salida" class="sys-input"></div>
+        <div class="form-field"><label>Número de huéspedes</label><input type="number" id="ci-huespedes" class="sys-input" value="1" min="1" max="10"></div>
+        <div class="form-field"><label>Precio por noche (S/.)</label><input type="number" id="ci-precio" class="sys-input" placeholder="0.00" step="0.01"></div>
+        <div class="form-field form-field-full"><label>Observaciones</label><textarea id="ci-obs" class="sys-input" rows="2" placeholder="Observaciones especiales..."></textarea></div>
+      </div>
+      <div class="form-actions">
+        <button class="sys-btn sys-btn-outline" data-modal="modal-checkin">Cancelar</button>
+        <button class="sys-btn sys-btn-gold" id="btn-confirmar-checkin">Confirmar Check-in</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal checkout -->
+<div id="modal-checkout" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head">
+      <h3>Check-out — Hab. <span id="co-hab-num"></span></h3>
+      <button class="modal-close" data-modal="modal-checkout">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <div class="checkout-summary" id="checkout-summary"></div>
+      <div class="form-actions">
+        <button class="sys-btn sys-btn-outline" data-modal="modal-checkout">Cancelar</button>
+        <button class="sys-btn sys-btn-gold" id="btn-confirmar-checkout">Confirmar Check-out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal producto -->
+<div id="modal-producto" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head">
+      <h3 id="modal-prod-title">Producto</h3>
+      <button class="modal-close" data-modal="modal-producto">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <div class="form-grid-2">
+        <div class="form-field"><label>Nombre</label><input type="text" id="prod-nombre" class="sys-input" placeholder="Nombre del producto"></div>
+        <div class="form-field"><label>Código (opcional)</label><input type="text" id="prod-codigo" class="sys-input" placeholder="P-001"></div>
+        <div class="form-field"><label>Categoría</label>
+          <select id="prod-categoria" class="sys-select">
+            <option value="bebidas">Bebidas</option>
+            <option value="snacks">Snacks/Alimentos</option>
+            <option value="higiene">Higiene</option>
+            <option value="servicios">Servicios</option>
+            <option value="otros">Otros</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Precio de compra (S/.)</label><input type="number" id="prod-precio-compra" class="sys-input" placeholder="0.00" step="0.01"></div>
+        <div class="form-field"><label>Precio de venta (S/.)</label><input type="number" id="prod-precio-venta" class="sys-input" placeholder="0.00" step="0.01"></div>
+        <div class="form-field"><label>Stock actual</label><input type="number" id="prod-stock" class="sys-input" placeholder="0"></div>
+        <div class="form-field"><label>Stock mínimo (alerta)</label><input type="number" id="prod-stock-min" class="sys-input" placeholder="5"></div>
+        <input type="hidden" id="prod-id">
+      </div>
+      <div class="form-actions">
+        <button class="sys-btn sys-btn-outline" data-modal="modal-producto">Cancelar</button>
+        <button class="sys-btn sys-btn-gold" id="btn-guardar-producto">Guardar producto</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal cliente -->
+<div id="modal-cliente" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head">
+      <h3 id="modal-cli-title">Cliente</h3>
+      <button class="modal-close" data-modal="modal-cliente">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <div class="form-grid-2">
+        <div class="form-field"><label>Nombre completo</label><input type="text" id="cli-nombre" class="sys-input"></div>
+        <div class="form-field"><label>DNI / Pasaporte</label><input type="text" id="cli-dni" class="sys-input"></div>
+        <div class="form-field"><label>Teléfono</label><input type="text" id="cli-tel" class="sys-input"></div>
+        <div class="form-field"><label>Email</label><input type="email" id="cli-email" class="sys-input"></div>
+        <div class="form-field form-field-full"><label>Observaciones</label><textarea id="cli-obs" class="sys-input" rows="2"></textarea></div>
+        <input type="hidden" id="cli-id">
+      </div>
+      <div class="form-actions">
+        <button class="sys-btn sys-btn-outline" data-modal="modal-cliente">Cancelar</button>
+        <button class="sys-btn sys-btn-gold" id="btn-guardar-cliente">Guardar cliente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal usuario -->
+<div id="modal-usuario" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head">
+      <h3>Gestionar usuario</h3>
+      <button class="modal-close" data-modal="modal-usuario">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <div class="form-grid-2">
+        <div class="form-field"><label>Nombre completo</label><input type="text" id="usr-nombre" class="sys-input"></div>
+        <div class="form-field"><label>Email</label><input type="email" id="usr-email" class="sys-input"></div>
+        <div class="form-field"><label>Rol / Cargo</label>
+          <select id="usr-rol" class="sys-select">
+            <option value="admin">Administrador</option>
+            <option value="recepcionista">Recepcionista</option>
+            <option value="cajero">Cajero</option>
+            <option value="limpieza">Limpieza</option>
+          </select>
+        </div>
+        <input type="hidden" id="usr-id">
+      </div>
+      <div class="form-actions">
+        <button class="sys-btn sys-btn-outline" data-modal="modal-usuario">Cancelar</button>
+        <button class="sys-btn sys-btn-gold" id="btn-guardar-usuario">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="sys-toast" class="sys-toast" style="display:none"></div>
+
+<link rel="stylesheet" href="/css/sistema.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="/js/sistema.js"></script>

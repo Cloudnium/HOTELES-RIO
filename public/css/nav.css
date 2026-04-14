@@ -217,3 +217,33 @@
   .hamburger { display: flex; }
   .mobile-menu { padding: 20px; }
 }
+
+/* ── Botón Sistema (Personal) ─────────────────────────────── */
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.btn-nav-sistema {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--charcoal);
+  color: var(--gold);
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border-radius: var(--radius, 4px);
+  transition: var(--transition);
+  text-decoration: none;
+}
+.btn-nav-sistema:hover {
+  background: var(--charcoal-mid);
+  color: var(--gold-light);
+}
+@media (max-width: 768px) {
+  .btn-nav-sistema { display: none; }
+}

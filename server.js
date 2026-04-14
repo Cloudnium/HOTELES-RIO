@@ -212,6 +212,16 @@ app.post('/contacto', async (req, res) => {
   });
 });
 
+
+// ── Sistema de Gestión Interna ──────────────────────────────
+app.get('/sistema', (req, res) => {
+  res.render('sistema', {
+    title: 'Sistema — Hoteles Rio',
+    page: 'sistema',
+    layout: 'main'
+  });
+});
+
 // ── 404 ─────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).render('404', { title: 'Página no encontrada', page: '' });
