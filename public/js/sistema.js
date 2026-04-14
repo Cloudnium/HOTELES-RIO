@@ -1,25 +1,20 @@
 // ============================================================
-//  sistema.js — Sistema de Gestión Interna Hoteles Rio v4
+//  sistema.js — Sistema de Gestión Interna Hoteles Rio v3
 // ============================================================
 
 const SUPABASE_URL      = 'https://jyzteirrmjangptekmgm.supabase.co';
-const SUPABASE_ANON_KEY = 'TeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5enRlaXJybWphbmdwdGVrbWdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMjExNTYsImV4cCI6MjA5MTY5NzE1Nn0.Qc85njSX6BE15i3w8WN2SJ8t1vYzAzPDrP_9FRkQQCk';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5enRlaXJybWphbmdwdGVrbWdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMjExNTYsImV4cCI6MjA5MTY5NzE1Nn0.Qc85njSX6BE15i3w8WN2SJ8t1vYzAzPDrP_9FRkQQCk';
 
 const { createClient } = supabase;
-// persistSession:true garantiza que la sesión sobrevive cambios de pestaña/ventana
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-});
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser        = null;
 let currentUserProfile = null;
 let cajaActual         = null;
-let carritoPublico     = {};
-let stockOp            = '+';
+let carritoPublico     = {}; // { prodId: { nombre, precio, cantidad } }
+let stockOp            = '+'; // para ajuste de stock
 
-// ══════════════════════════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════════════════════════
+// ── INIT ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   setDateBadge();
   setupLoginForm();
@@ -28,20 +23,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupModalUsuario();
   setupModalProducto();
 
-  // Intentar recuperar sesión guardada
   const { data: { session } } = await sb.auth.getSession();
-  if (session) {
-    await handleLogin(session.user);
-  }
+  if (session) await handleLogin(session.user);
 
-  // Escuchar cambios: SIGNED_IN, TOKEN_REFRESHED, SIGNED_OUT
   sb.auth.onAuthStateChange(async (event, session) => {
-    if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
-      if (!currentUser) await handleLogin(session.user);
-    } else if (event === 'SIGNED_OUT') {
-      currentUser = null; currentUserProfile = null; cajaActual = null;
-      showLogin();
-    }
+    if (event === 'SIGNED_IN' && session) await handleLogin(session.user);
+    else if (event === 'SIGNED_OUT') showLogin();
   });
 });
 
@@ -76,15 +63,13 @@ function setupLoginForm() {
   });
   passIn?.addEventListener('keydown', e => { if(e.key==='Enter') btn?.click(); });
 }
-
 function showLoginError(msg) {
   const el=document.getElementById('login-error');
   if(el){el.textContent=msg;el.style.display='block';}
 }
-
 async function handleLogin(user) {
   currentUser = user;
-  let { data: profile } = await sb.from('usuarios').select('*').eq('auth_id', user.id).single();
+  let { data: profile } = await sb.from('usuarios').select('*').eq('auth_id',user.id).single();
   if (!profile) {
     const { data:p } = await sb.from('usuarios').insert({
       auth_id:user.id, email:user.email,
@@ -94,68 +79,33 @@ async function handleLogin(user) {
     profile = p;
   }
   currentUserProfile = profile;
-
   const name = profile?.nombre||user.email.split('@')[0];
   const role = profile?.rol||'recepcionista';
-  document.getElementById('sys-user-name').textContent  = name;
-  document.getElementById('sys-user-role').textContent  = rolLabel(role);
-  document.getElementById('sys-avatar').textContent     = name.charAt(0).toUpperCase();
-
+  document.getElementById('sys-user-name').textContent = name;
+  document.getElementById('sys-user-role').textContent = rolLabel(role);
+  document.getElementById('sys-avatar').textContent    = name.charAt(0).toUpperCase();
   if (role==='limpieza') {
-    document.querySelectorAll('.sys-nav-item').forEach(item => {
+    document.querySelectorAll('.sys-nav-item').forEach(item=>{
       if(item.dataset.sec!=='habitaciones') item.style.display='none';
     });
   }
   if (role!=='admin') {
     document.querySelectorAll('[data-sec="usuarios"]').forEach(el=>el.style.display='none');
   }
-
-  // Recuperar caja activa del usuario
-  await recuperarCajaActiva();
-
   showDashboard();
   loadSection('habitaciones');
 }
-
-// Recuperar caja activa persistida
-async function recuperarCajaActiva() {
-  const hoy = new Date().toISOString().split('T')[0];
-  const { data:cajas } = await sb.from('cajas')
-    .select('*').eq('fecha', hoy).eq('estado', 'abierta')
-    .eq('usuario_id', currentUserProfile.id);
-  cajaActual = cajas?.[0] || null;
-}
-
 function rolLabel(r){ return {admin:'Administrador',recepcionista:'Recepcionista',cajero:'Cajero',limpieza:'Limpieza'}[r]||r; }
-
-document.getElementById('sys-logout')?.addEventListener('click', async () => {
-  await sb.auth.signOut();
-});
-
-function showLogin() {
-  document.getElementById('login-screen').style.display='flex';
-  document.getElementById('dashboard').style.display='none';
-}
-function showDashboard() {
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('dashboard').style.display='flex';
-}
-
-// ══════════════════════════════════════════════════════════
-//  GUARD: requiere caja abierta
-// ══════════════════════════════════════════════════════════
-function requireCaja(accion) {
-  if (cajaActual) return true;
-  showToast(`⚠️ Debes abrir tu caja antes de ${accion}. Ve a Finanzas → Cajas del Día.`, 'err');
-  return false;
-}
+document.getElementById('sys-logout')?.addEventListener('click', ()=>sb.auth.signOut());
+function showLogin()     { document.getElementById('login-screen').style.display='flex';document.getElementById('dashboard').style.display='none'; }
+function showDashboard() { document.getElementById('login-screen').style.display='none';document.getElementById('dashboard').style.display='flex'; }
 
 // ══════════════════════════════════════════════════════════
 //  NAVEGACIÓN
 // ══════════════════════════════════════════════════════════
 function setupNavigation() {
-  document.querySelectorAll('.sys-nav-item').forEach(item => {
-    item.addEventListener('click', () => {
+  document.querySelectorAll('.sys-nav-item').forEach(item=>{
+    item.addEventListener('click',()=>{
       const sec=item.dataset.sec; if(!sec) return;
       document.querySelectorAll('.sys-nav-item').forEach(i=>i.classList.remove('active'));
       item.classList.add('active');
@@ -163,18 +113,16 @@ function setupNavigation() {
       document.getElementById('sys-sidebar')?.classList.remove('open');
     });
   });
-  document.getElementById('sys-menu-toggle')?.addEventListener('click', () => {
+  document.getElementById('sys-menu-toggle')?.addEventListener('click',()=>{
     document.getElementById('sys-sidebar')?.classList.toggle('open');
   });
 }
-
 const sectionTitles = {
   habitaciones:'Habitaciones','tienda-hab':'Tienda por Habitación',
   'tienda-publica':'Tienda Pública',almacen:'Almacén',
   cajas:'Cajas del Día',reportes:'Reportes',
   comprobantes:'Comprobantes',clientes:'Clientes',usuarios:'Usuarios'
 };
-
 function loadSection(sec) {
   document.querySelectorAll('.sys-section').forEach(s=>s.classList.remove('active'));
   const el=document.getElementById(`sec-${sec}`);
@@ -190,13 +138,16 @@ function loadSection(sec) {
 }
 
 // ══════════════════════════════════════════════════════════
-//  SERIE CORRELATIVA  T001-XXXXXXXX / T002-XXXXXXXX / T003-XXXXXXXX
+//  SERIE CORRELATIVA  — formato T001-00000001
 // ══════════════════════════════════════════════════════════
 async function getSiguienteSerie(tipo) {
-  const prefix = { HAB:'T001', PUB:'T002', CAJA:'T003' }[tipo] || 'T001';
+  // tipo: 'HAB' (habitaciones) | 'PUB' (tienda publica)
+  const prefix = tipo==='HAB' ? 'T001' : 'T002';
   const { count } = await sb.from('comprobantes')
-    .select('*', { count:'exact', head:true }).eq('tipo_serie', tipo);
-  return `${prefix}-${String((count||0)+1).padStart(8,'0')}`;
+    .select('*', { count:'exact', head:true })
+    .eq('tipo_serie', tipo);
+  const num = String((count||0)+1).padStart(8,'0');
+  return `${prefix}-${num}`;
 }
 
 async function registrarComprobante({ serie, tipo, descripcion, cliente, total, metodo_pago, datos_json, check_in_id, venta_publica_id }) {
@@ -210,72 +161,40 @@ async function registrarComprobante({ serie, tipo, descripcion, cliente, total, 
 }
 
 // ══════════════════════════════════════════════════════════
-//  HABITACIONES — agrupadas por categoría
+//  HABITACIONES
 // ══════════════════════════════════════════════════════════
 async function loadHabitaciones() {
   let query = sb.from('habitaciones').select('*').order('numero');
+  const piso   = document.getElementById('filter-piso')?.value;
   const estado = document.getElementById('filter-estado')?.value;
-  if(estado) query = query.eq('estado', estado);
+  if(piso)   query=query.eq('piso',parseInt(piso));
+  if(estado) query=query.eq('estado',estado);
   const { data } = await query;
   renderRoomsGrid(data||[]);
-
-  const fe=document.getElementById('filter-estado');
-  if(fe&&!fe._bound){fe._bound=true;fe.addEventListener('change',loadHabitaciones);}
-  // Quitar filtro de piso ya que ahora agrupamos por categoría
   const fp=document.getElementById('filter-piso');
-  if(fp) fp.style.display='none';
+  const fe=document.getElementById('filter-estado');
+  if(fp&&!fp._bound){fp._bound=true;fp.addEventListener('change',loadHabitaciones);}
+  if(fe&&!fe._bound){fe._bound=true;fe.addEventListener('change',loadHabitaciones);}
 }
-
-const CATEGORIAS_ORDEN = ['economico','premium','suite'];
-const CATEGORIA_LABELS = { economico:'Económico', premium:'Premium', suite:'Suite' };
-const CATEGORIA_COLORS = { economico:'#2563eb', premium:'#7c3aed', suite:'#b45309' };
-
 function renderRoomsGrid(rooms) {
   const grid=document.getElementById('rooms-grid');
   if(!grid) return;
   if(!rooms.length){grid.innerHTML='<p style="color:var(--text-light);padding:20px">No hay habitaciones.</p>';return;}
-
-  // Agrupar por categoría
-  const grupos = {};
-  CATEGORIAS_ORDEN.forEach(c => grupos[c]=[]);
-  rooms.forEach(r => {
-    const cat = (r.categoria||'economico').toLowerCase();
-    if(!grupos[cat]) grupos[cat]=[];
-    grupos[cat].push(r);
-  });
-
-  let html = '';
-  CATEGORIAS_ORDEN.forEach(cat => {
-    const lista = grupos[cat];
-    if(!lista||!lista.length) return;
-    const color = CATEGORIA_COLORS[cat];
-    html += `
-      <div class="cat-group">
-        <div class="cat-group-header" style="border-left-color:${color}">
-          <span class="cat-group-label" style="color:${color}">${CATEGORIA_LABELS[cat]||cat}</span>
-          <span class="cat-group-count">${lista.length} habitacion${lista.length!==1?'es':''}</span>
+  grid.innerHTML=rooms.map(r=>`
+    <div class="room-card-sys" onclick="openRoomModal(${r.id})">
+      <div class="room-card-top">
+        <div>
+          <div class="room-card-num">NRO: ${String(r.numero).padStart(3,'0')}</div>
+          <div class="room-card-cat">CATEGORÍA: ${(r.categoria||'').toUpperCase()}</div>
         </div>
-        <div class="cat-rooms-grid">
-          ${lista.map(r=>`
-            <div class="room-card-sys" onclick="openRoomModal(${r.id})">
-              <div class="room-card-top">
-                <div>
-                  <div class="room-card-num">NRO: ${String(r.numero).padStart(3,'0')}</div>
-                  <div class="room-card-cat">S/. ${r.precio_noche||0}/noche</div>
-                </div>
-                <div class="room-card-icon">${roomIcon(r.estado)}</div>
-              </div>
-              <div class="room-card-status status-${r.estado||'disponible'}">
-                <span>${(r.estado||'DISPONIBLE').toUpperCase()}</span>
-                <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-              </div>
-            </div>`).join('')}
-        </div>
-      </div>`;
-  });
-  grid.innerHTML = html;
+        <div class="room-card-icon">${roomIcon(r.estado)}</div>
+      </div>
+      <div class="room-card-status status-${r.estado||'disponible'}">
+        <span>${(r.estado||'DISPONIBLE').toUpperCase()}</span>
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>`).join('');
 }
-
 function roomIcon(e){ return {disponible:'🛏️',ocupado:'🔴',limpieza:'🧹',mantenimiento:'🔧',reservado:'📋'}[e]||'🛏️'; }
 
 async function openRoomModal(id) {
@@ -284,49 +203,41 @@ async function openRoomModal(id) {
   const { data:checkins } = await sb.from('check_ins')
     .select('*, clientes(nombre)').eq('habitacion_id',id).is('check_out_real',null);
   const checkinActivo = checkins?.[0];
-  document.getElementById('modal-hab-title').textContent=
-    `Habitación ${String(room.numero).padStart(3,'0')} — ${CATEGORIA_LABELS[room.categoria]||room.categoria}`;
+  document.getElementById('modal-hab-title').textContent=`Habitación ${String(room.numero).padStart(3,'0')} — ${room.categoria}`;
   const info=document.getElementById('modal-hab-info');
   const actions=document.getElementById('modal-hab-actions');
   info.innerHTML=`
     <h2>Habitación ${String(room.numero).padStart(3,'0')}</h2>
     <div class="modal-info-row"><span>Estado</span><span><span class="badge badge-${badgeColor(room.estado)}">${room.estado}</span></span></div>
-    <div class="modal-info-row"><span>Categoría</span><span>${CATEGORIA_LABELS[room.categoria]||room.categoria}</span></div>
+    <div class="modal-info-row"><span>Categoría</span><span>${room.categoria}</span></div>
+    <div class="modal-info-row"><span>Piso</span><span>${room.piso}</span></div>
     <div class="modal-info-row"><span>Precio/noche</span><span>S/. ${room.precio_noche||'—'}</span></div>
     ${checkinActivo?`
       <div class="modal-info-row"><span>Huésped</span><span>${checkinActivo.clientes?.nombre||checkinActivo.nombre_huesped}</span></div>
       <div class="modal-info-row"><span>Check-in</span><span>${formatDate(checkinActivo.check_in_fecha)}</span></div>
-      <div class="modal-info-row"><span>Salida est.</span><span>${formatDate(checkinActivo.check_out_estimado)}</span></div>
+      <div class="modal-info-row"><span>Salida estimada</span><span>${formatDate(checkinActivo.check_out_estimado)}</span></div>
     `:''}`;
   actions.innerHTML='';
-
-  if(room.estado==='disponible'||room.estado==='reservado') {
-    addBtn(actions,'✅ Check-in','sys-btn-gold',()=>{
-      if(!requireCaja('hacer check-in')) return;
-      openCheckinModal(room); closeModal('modal-habitacion');
-    });
+  if(room.estado==='disponible'||room.estado==='reservado'){
+    addBtn(actions,'✅ Check-in','sys-btn-gold',()=>{openCheckinModal(room);closeModal('modal-habitacion');});
   }
-  if(room.estado==='ocupado'&&checkinActivo) {
-    addBtn(actions,'🚪 Check-out','sys-btn-red',()=>{
-      if(!requireCaja('hacer check-out')) return;
-      openCheckoutModal(room,checkinActivo); closeModal('modal-habitacion');
-    });
+  if(room.estado==='ocupado'&&checkinActivo){
+    addBtn(actions,'🚪 Check-out','sys-btn-red',()=>{openCheckoutModal(room,checkinActivo);closeModal('modal-habitacion');});
   }
-
   const estados=['disponible','ocupado','limpieza','mantenimiento','reservado'].filter(e=>e!==room.estado);
-  const ss=document.createElement('select'); ss.className='sys-select';
-  ss.innerHTML=`<option value="">Cambiar estado...</option>`+estados.map(e=>`<option value="${e}">${e}</option>`).join('');
-  ss.addEventListener('change',async()=>{
-    if(!ss.value) return;
-    await sb.from('habitaciones').update({estado:ss.value}).eq('id',id);
+  const stateSelect=document.createElement('select');
+  stateSelect.className='sys-select';
+  stateSelect.innerHTML=`<option value="">Cambiar estado...</option>`+estados.map(e=>`<option value="${e}">${e}</option>`).join('');
+  stateSelect.addEventListener('change',async()=>{
+    if(!stateSelect.value) return;
+    await sb.from('habitaciones').update({estado:stateSelect.value}).eq('id',id);
     showToast('Estado actualizado','ok'); closeModal('modal-habitacion'); loadHabitaciones();
   });
-  actions.appendChild(ss);
+  actions.appendChild(stateSelect);
   openModal('modal-habitacion');
 }
-
-function addBtn(c,t,cls,fn){const b=document.createElement('button');b.className=`sys-btn ${cls}`;b.innerHTML=t;b.addEventListener('click',fn);c.appendChild(b);}
-function badgeColor(e){return{disponible:'verde',ocupado:'rojo',limpieza:'celeste',mantenimiento:'amarillo',reservado:'naranja'}[e]||'gold';}
+function addBtn(c,t,cls,fn){ const b=document.createElement('button');b.className=`sys-btn ${cls}`;b.innerHTML=t;b.addEventListener('click',fn);c.appendChild(b); }
+function badgeColor(e){ return {disponible:'verde',ocupado:'rojo',limpieza:'celeste',mantenimiento:'amarillo',reservado:'naranja'}[e]||'gold'; }
 
 // ── CHECK-IN ───────────────────────────────────────────────
 function openCheckinModal(room) {
@@ -340,27 +251,26 @@ function openCheckinModal(room) {
   openModal('modal-checkin');
 }
 async function confirmarCheckin(habId) {
-  if(!requireCaja('hacer check-in')) return;
   const nombre=document.getElementById('ci-nombre').value.trim();
   const dni   =document.getElementById('ci-dni').value.trim();
-  if(!nombre||!dni){showToast('Nombre y DNI son obligatorios','err');return;}
+  if(!nombre||!dni){ showToast('Nombre y DNI son obligatorios','err'); return; }
   let clienteId=null;
   const { data:ce } = await sb.from('clientes').select('id').eq('dni',dni).maybeSingle();
-  if(ce){clienteId=ce.id;}
-  else{
+  if(ce){ clienteId=ce.id; }
+  else {
     const { data:nc } = await sb.from('clientes').insert({
       nombre,dni,telefono:document.getElementById('ci-tel').value,email:document.getElementById('ci-email').value
     }).select('id').single();
     clienteId=nc?.id;
   }
   await sb.from('check_ins').insert({
-    habitacion_id:habId,cliente_id:clienteId,nombre_huesped:nombre,dni_huesped:dni,
+    habitacion_id:habId, cliente_id:clienteId, nombre_huesped:nombre, dni_huesped:dni,
     check_in_fecha:document.getElementById('ci-entrada').value,
     check_out_estimado:document.getElementById('ci-salida').value,
     num_huespedes:parseInt(document.getElementById('ci-huespedes').value)||1,
     precio_noche:parseFloat(document.getElementById('ci-precio').value)||0,
     observaciones:document.getElementById('ci-obs').value,
-    usuario_id:currentUserProfile?.id,caja_id:cajaActual?.id,
+    usuario_id:currentUserProfile?.id, caja_id:cajaActual?.id,
   });
   await sb.from('habitaciones').update({estado:'ocupado'}).eq('id',habId);
   showToast('✅ Check-in registrado','ok');
@@ -368,10 +278,9 @@ async function confirmarCheckin(habId) {
 }
 
 // ── CHECK-OUT ──────────────────────────────────────────────
-async function openCheckoutModal(room,checkin) {
-  if(!requireCaja('hacer check-out')) return;
+async function openCheckoutModal(room, checkin) {
   document.getElementById('co-hab-num').textContent=String(room.numero).padStart(3,'0');
-  const entrada=new Date(checkin.check_in_fecha),hoy=new Date();
+  const entrada=new Date(checkin.check_in_fecha), hoy=new Date();
   const noches=Math.max(1,Math.ceil((hoy-entrada)/(1000*60*60*24)));
   const totalHab=noches*(checkin.precio_noche||0);
   const { data:consumos } = await sb.from('consumos_habitacion')
@@ -384,7 +293,7 @@ async function openCheckoutModal(room,checkin) {
     <div class="checkout-row"><span>Noches</span><span>${noches}</span></div>
     <div class="checkout-row"><span>Precio x noche</span><span>S/. ${(checkin.precio_noche||0).toFixed(2)}</span></div>
     <div class="checkout-row"><span>Total habitación</span><span>S/. ${totalHab.toFixed(2)}</span></div>
-    ${consumos?.map(c=>`<div class="checkout-row"><span>&nbsp;• ${c.productos?.nombre} x${c.cantidad}</span><span>S/. ${c.precio_total?.toFixed(2)}</span></div>`).join('')||''}
+    ${consumos?.map(c=>`<div class="checkout-row"><span>&nbsp;&nbsp;• ${c.productos?.nombre} x${c.cantidad}</span><span>S/. ${c.precio_total?.toFixed(2)}</span></div>`).join('')||''}
     <div class="checkout-row"><span>Consumos extras</span><span>S/. ${totalConsumos.toFixed(2)}</span></div>
     <div class="checkout-row checkout-total"><span>TOTAL A COBRAR</span><span>S/. ${totalGeneral.toFixed(2)}</span></div>
     <div class="pago-section">
@@ -412,39 +321,53 @@ async function openCheckoutModal(room,checkin) {
     });
   });
   document.getElementById('efectivo-recibido')?.addEventListener('input',e=>{
-    const v=Math.max(0,parseFloat(e.target.value||0)-totalGeneral);
+    const vuelto=Math.max(0,parseFloat(e.target.value||0)-totalGeneral);
     const vd=document.getElementById('vuelto-display');
-    vd.textContent=`S/. ${v.toFixed(2)}`; vd.style.color=v>0?'var(--gold)':'var(--text-mid)';
+    vd.textContent=`S/. ${vuelto.toFixed(2)}`;
+    vd.style.color=vuelto>0?'var(--gold)':'var(--text-mid)';
   });
   document.getElementById('btn-confirmar-checkout').onclick=async()=>{
     const recibido=parseFloat(document.getElementById('efectivo-recibido')?.value)||totalGeneral;
     const vuelto=metodoPago==='Efectivo'?Math.max(0,recibido-totalGeneral):0;
-    await confirmarCheckout(room,checkin,totalGeneral,consumos,metodoPago,vuelto,noches,totalHab,totalConsumos);
+    await confirmarCheckout(room,checkin,totalGeneral,consumos,metodoPago,vuelto,noches);
   };
   openModal('modal-checkout');
 }
-
-async function confirmarCheckout(room,checkin,total,consumos,metodoPago,vuelto,noches,totalHab,totalConsumos) {
+async function confirmarCheckout(room,checkin,total,consumos,metodoPago,vuelto,noches) {
   await sb.from('check_ins').update({check_out_real:new Date().toISOString(),total_cobrado:total,metodo_pago:metodoPago}).eq('id',checkin.id);
   await sb.from('habitaciones').update({estado:'limpieza'}).eq('id',room.id);
   if(consumos?.length) await sb.from('consumos_habitacion').update({cobrado:true}).in('id',consumos.map(c=>c.id));
-  await sb.from('movimientos_caja').insert({
-    caja_id:cajaActual.id,concepto:`Check-out Hab.${String(room.numero).padStart(3,'0')} (${metodoPago})`,
-    tipo:'ingreso',monto:total,usuario_id:currentUserProfile?.id,
-  });
+  if(cajaActual) {
+    await sb.from('movimientos_caja').insert({
+      caja_id:cajaActual.id,concepto:`Check-out Hab.${String(room.numero).padStart(3,'0')} (${metodoPago})`,
+      tipo:'ingreso',monto:total,usuario_id:currentUserProfile?.id,
+    });
+  }
+  // Serie y comprobante
   const serie=await getSiguienteSerie('HAB');
-  const datosTicket={serie,room,checkin,consumos,total,metodoPago,vuelto,noches,totalHab,totalConsumos,cajero:currentUserProfile?.nombre||'—',fecha:new Date().toISOString()};
-  await registrarComprobante({serie,tipo:'HAB',descripcion:`Hab.${String(room.numero).padStart(3,'0')} — ${room.categoria} — ${noches} noche(s)`,cliente:checkin.nombre_huesped,total,metodo_pago:metodoPago,datos_json:datosTicket,check_in_id:checkin.id});
+  const datosTicket={
+    serie,room,checkin,consumos,total,metodoPago,vuelto,noches,
+    totalHab:noches*(checkin.precio_noche||0),
+    totalConsumos:consumos?.reduce((s,c)=>s+(c.precio_total||0),0)||0,
+    cajero:currentUserProfile?.nombre||'—',
+    fecha:new Date().toISOString(),
+  };
+  await registrarComprobante({
+    serie,tipo:'HAB',
+    descripcion:`Hab.${String(room.numero).padStart(3,'0')} — ${room.categoria} — ${noches} noche(s)`,
+    cliente:checkin.nombre_huesped, total, metodo_pago:metodoPago,
+    datos_json:datosTicket, check_in_id:checkin.id,
+  });
   imprimirTicketHabitacion(datosTicket);
   showToast('🚪 Check-out completado','ok');
   closeModal('modal-checkout'); loadHabitaciones();
 }
 
 // ══════════════════════════════════════════════════════════
-//  TICKETS IMPRESIÓN TÉRMICA 80mm
+//  TICKETS DE IMPRESIÓN TÉRMICA 80mm
 // ══════════════════════════════════════════════════════════
-function abrirVentanaTicket(html) {
-  const win=window.open('','_blank','width=420,height=740');
+function abrirVentanaTicket(htmlContent) {
+  const win=window.open('','_blank','width=420,height=720');
   win.document.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8"><title>Ticket</title>
     <style>
@@ -464,7 +387,7 @@ function abrirVentanaTicket(html) {
       @media print{button{display:none!important}}
     </style>
   </head><body>
-    ${html}
+    ${htmlContent}
     <div style="text-align:center;margin-top:10px">
       <button onclick="window.print()" style="padding:8px 22px;font-size:13px;cursor:pointer;background:#1a1a1a;color:#fff;border:none;border-radius:4px;font-family:sans-serif">🖨 Imprimir</button>
     </div>
@@ -493,22 +416,28 @@ function cabecera(serie) {
 }
 
 function imprimirTicketHabitacion(d) {
-  const consumosHTML=d.consumos?.length
-    ?`<div class="ln"></div><div class="b sm">Consumos:</div><table>${d.consumos.map(c=>`<tr><td>${c.productos?.nombre||'—'}</td><td class="r">x${c.cantidad}</td><td class="r">S/.${c.precio_total?.toFixed(2)}</td></tr>`).join('')}</table>`:''
-  const pagoHTML=d.metodoPago==='Efectivo'
-    ?`<tr><td>Efectivo recibido:</td><td class="r">S/. ${(d.total+d.vuelto).toFixed(2)}</td></tr><tr><td>Vuelto:</td><td class="r">S/. ${d.vuelto.toFixed(2)}</td></tr>`:''
+  const consumosHTML = d.consumos?.length
+    ? `<div class="ln"></div>
+       <div class="b sm">Consumos:</div>
+       <table>${d.consumos.map(c=>`<tr><td>${c.productos?.nombre||'—'}</td><td class="r">x${c.cantidad}</td><td class="r">S/.${c.precio_total?.toFixed(2)}</td></tr>`).join('')}</table>`
+    : '';
+  const pagoHTML = d.metodoPago==='Efectivo'
+    ? `<tr><td>Efectivo recibido:</td><td class="r">S/. ${(d.total+d.vuelto).toFixed(2)}</td></tr>
+       <tr><td>Vuelto:</td><td class="r">S/. ${d.vuelto.toFixed(2)}</td></tr>` : '';
   abrirVentanaTicket(`
     ${cabecera(d.serie)}
     <div><span class="b">Cliente:</span> ${d.checkin.nombre_huesped}</div>
     <div><span class="b">DNI:</span> ${d.checkin.dni_huesped||'—'}</div>
     <div class="ln"></div>
     <table>
-      <tr><td>Hab. — ${d.noches} noche(s)</td><td class="r">S/.${d.totalHab.toFixed(2)}</td></tr>
+      <tr><td>Habitación — ${d.noches} noche(s)</td><td class="r">S/.${d.totalHab.toFixed(2)}</td></tr>
       <tr><td class="sm">&nbsp;Precio/noche: S/.${(d.checkin.precio_noche||0).toFixed(2)}</td><td></td></tr>
     </table>
     ${consumosHTML}
     <div class="ln"></div>
-    <table><tr class="tr-total"><td class="b">TOTAL A PAGAR:</td><td class="r b">S/. ${d.total.toFixed(2)}</td></tr></table>
+    <table>
+      <tr class="tr-total"><td class="b">TOTAL A PAGAR:</td><td class="r b">S/. ${d.total.toFixed(2)}</td></tr>
+    </table>
     <div class="ln"></div>
     <table>
       <tr><td>Método de pago:</td><td class="r">${d.metodoPago}</td></tr>
@@ -516,7 +445,7 @@ function imprimirTicketHabitacion(d) {
     </table>
     <div class="ln"></div>
     <div class="hab-num">${String(d.room.numero).padStart(3,'0')}</div>
-    <div class="hab-cat">${(CATEGORIA_LABELS[d.room.categoria]||d.room.categoria||'').toUpperCase()}</div>
+    <div class="hab-cat">${(d.room.categoria||'').toUpperCase()}</div>
     <div class="ln"></div>
     <div class="c sm">Cajero: ${d.cajero}</div>
     <div class="c sm">¡Gracias por su visita! — Hoteles Rio</div>
@@ -524,14 +453,15 @@ function imprimirTicketHabitacion(d) {
 }
 
 function imprimirTicketTienda(d) {
-  const pagoHTML=d.metodoPago==='Efectivo'
-    ?`<tr><td>Efectivo recibido:</td><td class="r">S/. ${(d.total+d.vuelto).toFixed(2)}</td></tr><tr><td>Vuelto:</td><td class="r">S/. ${d.vuelto.toFixed(2)}</td></tr>`:''
+  const pagoHTML = d.metodoPago==='Efectivo'
+    ? `<tr><td>Efectivo recibido:</td><td class="r">S/. ${(d.total+d.vuelto).toFixed(2)}</td></tr>
+       <tr><td>Vuelto:</td><td class="r">S/. ${d.vuelto.toFixed(2)}</td></tr>` : '';
   abrirVentanaTicket(`
     ${cabecera(d.serie)}
     <div class="c b">VENTA AL PÚBLICO</div>
     <div class="ln"></div>
     <div><span class="b">Cajero:</span> ${d.cajero}</div>
-    ${d.caja?`<div><span class="b">Caja:</span> ${d.caja}</div>`:''}
+    ${d.caja ? `<div><span class="b">Caja:</span> ${d.caja}</div>` : ''}
     <div class="ln"></div>
     <table>
       <tr><td class="b">Descripción</td><td class="r b">Cant.</td><td class="r b">Total</td></tr>
@@ -544,66 +474,32 @@ function imprimirTicketTienda(d) {
       ${pagoHTML}
     </table>
     <div class="ln"></div>
-    <div class="c sm">¡Gracias por su compra! — Hoteles Rio</div>
+    <div class="c sm">¡Gracias por su compra!</div>
+    <div class="c sm">Hoteles Rio — Sullana, Perú</div>
     <br><br>`);
 }
 
-function imprimirTicketCaja(d) {
-  // d: { serie, caja, usuario, fecha, movimientos, resumenMetodos, totalGeneral }
-  const filasMov = d.movimientos.slice(0,30).map(m=>
-    `<tr><td class="sm">${formatTime(m.created_at)}</td><td class="sm">${m.concepto?.substring(0,20)}</td><td class="r sm">${m.tipo==='ingreso'?'+':'-'}${m.monto?.toFixed(2)}</td></tr>`
-  ).join('');
-  const filasMetodos = Object.entries(d.resumenMetodos).map(([met,monto])=>
-    `<tr><td>${met}</td><td class="r b">S/. ${monto.toFixed(2)}</td></tr>`
-  ).join('');
-  abrirVentanaTicket(`
-    <div class="c">
-      <img src="/images/logos/logo.png" class="logo" onerror="this.style.display='none'">
-      <div class="b big">HOTELES RIO</div>
-    </div>
-    <div class="ln"></div>
-    <div class="c b">RESUMEN DE CAJA</div>
-    <div class="serie">${d.serie}</div>
-    <div class="ln"></div>
-    <table>
-      <tr><td class="b">Caja:</td><td class="r">${d.caja}</td></tr>
-      <tr><td class="b">Usuario:</td><td class="r">${d.usuario}</td></tr>
-      <tr><td class="b">Fecha:</td><td class="r">${d.fecha}</td></tr>
-      <tr><td class="b">Estado:</td><td class="r">${d.estado}</td></tr>
-    </table>
-    <div class="ln"></div>
-    <div class="b sm">INGRESOS POR MÉTODO DE PAGO:</div>
-    <table>${filasMetodos}</table>
-    <div class="ln"></div>
-    <table><tr class="tr-total"><td class="b">TOTAL CAJA:</td><td class="r b">S/. ${d.totalGeneral.toFixed(2)}</td></tr></table>
-    <div class="ln"></div>
-    <div class="b sm">DETALLE DE MOVIMIENTOS (${d.movimientos.length}):</div>
-    <table>${filasMov}</table>
-    ${d.movimientos.length>30?`<div class="c sm">... y ${d.movimientos.length-30} más</div>`:''}
-    <div class="ln"></div>
-    <div class="c sm">Impreso: ${new Date().toLocaleString('es-PE')}</div>
-    <br><br>`);
-}
-
+// Reimprimir desde comprobante guardado
 function reimprimirComprobante(comp) {
   try {
-    const d=typeof comp.datos_json==='string'?JSON.parse(comp.datos_json):comp.datos_json;
-    if(comp.tipo_serie==='HAB') imprimirTicketHabitacion(d);
-    else if(comp.tipo_serie==='PUB') imprimirTicketTienda(d);
-    else if(comp.tipo_serie==='CAJA') imprimirTicketCaja(d);
-  } catch(e){ showToast('No se puede reimprimir','err'); }
+    const d = typeof comp.datos_json === 'string' ? JSON.parse(comp.datos_json) : comp.datos_json;
+    if (comp.tipo_serie === 'HAB') imprimirTicketHabitacion(d);
+    else imprimirTicketTienda(d);
+  } catch(e) {
+    showToast('No se puede reimprimir este comprobante','err');
+  }
 }
 
 // ══════════════════════════════════════════════════════════
 //  TIENDA POR HABITACIÓN
 // ══════════════════════════════════════════════════════════
 async function loadTiendaHab() {
-  if(!requireCaja('vender productos')) return;
   const { data:ocupadas } = await sb.from('habitaciones').select('numero,id').eq('estado','ocupado').order('numero');
   const ids=ocupadas?.map(h=>h.id)||[];
   let checkinMap={};
   if(ids.length){
-    const { data:cis } = await sb.from('check_ins').select('habitacion_id,id,nombre_huesped').in('habitacion_id',ids).is('check_out_real',null);
+    const { data:cis } = await sb.from('check_ins')
+      .select('habitacion_id,id,nombre_huesped').in('habitacion_id',ids).is('check_out_real',null);
     cis?.forEach(c=>{checkinMap[c.habitacion_id]=c;});
   }
   const sel=document.getElementById('sel-hab-tienda');
@@ -631,11 +527,13 @@ async function loadConsumosHab() {
   document.getElementById('total-consumos-hab').textContent=`S/. ${total.toFixed(2)}`;
 }
 async function agregarConsumoHab(productoId,nombre,precio) {
-  if(!requireCaja('agregar consumos')) return;
   const sel=document.getElementById('sel-hab-tienda');
   const checkinId=sel?.options[sel.selectedIndex]?.dataset.checkin;
   if(!checkinId){showToast('Selecciona una habitación primero','err');return;}
-  await sb.from('consumos_habitacion').insert({check_in_id:checkinId,producto_id:productoId,cantidad:1,precio_unitario:precio,precio_total:precio,usuario_id:currentUserProfile?.id});
+  await sb.from('consumos_habitacion').insert({
+    check_in_id:checkinId,producto_id:productoId,cantidad:1,
+    precio_unitario:precio,precio_total:precio,usuario_id:currentUserProfile?.id,
+  });
   await sb.rpc('descontar_stock',{p_producto_id:productoId,p_cantidad:1});
   showToast(`+1 ${nombre}`,'ok'); loadConsumosHab();
 }
@@ -645,14 +543,14 @@ async function eliminarConsumo(id){
 }
 
 // ══════════════════════════════════════════════════════════
-//  TIENDA PÚBLICA
+//  TIENDA PÚBLICA — CORREGIDA
 // ══════════════════════════════════════════════════════════
 async function loadTiendaPublica() {
-  if(!requireCaja('vender en tienda')) return;
   carritoPublico={};
   await loadProductsQuick('products-catalog',true);
   await loadVentasHoy();
   renderTotalPublico();
+
   const inp=document.getElementById('search-product-pub');
   if(inp&&!inp._bound){
     inp._bound=true;
@@ -663,45 +561,79 @@ async function loadTiendaPublica() {
       });
     });
   }
-  const btnN=document.getElementById('btn-nueva-venta-pub');
-  if(btnN){btnN.onclick=()=>{carritoPublico={};renderTotalPublico();document.querySelectorAll('.pq-carrito').forEach(el=>el.textContent='');showToast('Carrito limpiado','ok');};}
-  const btnC=document.getElementById('btn-confirmar-venta-pub');
-  if(btnC) btnC.onclick=abrirModalPagoPub;
+
+  // Limpiar carrito
+  const btnNueva=document.getElementById('btn-nueva-venta-pub');
+  if(btnNueva){
+    btnNueva.onclick=()=>{
+      carritoPublico={};
+      renderTotalPublico();
+      document.querySelectorAll('#products-catalog .pq-carrito').forEach(el=>el.textContent='');
+      showToast('Carrito limpiado','ok');
+    };
+  }
+
+  // Botón confirmar → abre modal pago
+  const btnConf=document.getElementById('btn-confirmar-venta-pub');
+  if(btnConf) btnConf.onclick=abrirModalPagoPub;
 }
+
 async function loadVentasHoy() {
   const hoy=new Date().toISOString().split('T')[0];
-  const { data:ventas } = await sb.from('ventas_publicas').select('*, usuarios(nombre)').gte('created_at',hoy+'T00:00:00').order('created_at',{ascending:false});
-  const tbody=document.getElementById('ventas-pub-list'); if(!tbody) return;
-  tbody.innerHTML=ventas?.length?ventas.map(v=>`<tr><td>${formatTime(v.created_at)}</td><td>${v.detalle||'—'}</td><td>S/. ${v.total?.toFixed(2)}</td><td>${v.usuarios?.nombre||'—'}</td></tr>`).join(''):'<tr><td colspan="4" class="empty-row">Sin ventas hoy</td></tr>';
+  const { data:ventas } = await sb.from('ventas_publicas')
+    .select('*, usuarios(nombre)').gte('created_at',hoy+'T00:00:00').order('created_at',{ascending:false});
+  const tbody=document.getElementById('ventas-pub-list');
+  if(!tbody) return;
+  tbody.innerHTML=ventas?.length
+    ?ventas.map(v=>`<tr><td>${formatTime(v.created_at)}</td><td>${v.detalle||'—'}</td><td>S/. ${v.total?.toFixed(2)}</td><td>${v.usuarios?.nombre||'—'}</td></tr>`).join('')
+    :'<tr><td colspan="4" class="empty-row">Sin ventas hoy</td></tr>';
 }
-function renderTotalPublico(){
+
+function renderTotalPublico() {
   const total=Object.values(carritoPublico).reduce((s,i)=>s+i.precio*i.cantidad,0);
-  const el=document.getElementById('total-pub-display'); if(el) el.textContent=`S/. ${total.toFixed(2)}`;
+  const el=document.getElementById('total-pub-display');
+  if(el) el.textContent=`S/. ${total.toFixed(2)}`;
 }
-function addToCarritoPublico(prodId,nombre,precio){
-  if(!requireCaja('vender')) return;
+
+function addToCarritoPublico(prodId,nombre,precio) {
   if(!carritoPublico[prodId]) carritoPublico[prodId]={nombre,precio,cantidad:0};
   carritoPublico[prodId].cantidad++;
-  const el=document.getElementById(`carrito-${prodId}`); if(el) el.textContent=`× ${carritoPublico[prodId].cantidad}`;
+  const el=document.getElementById(`carrito-${prodId}`);
+  if(el) el.textContent=`× ${carritoPublico[prodId].cantidad}`;
   renderTotalPublico();
 }
-function abrirModalPagoPub(){
-  if(!requireCaja('confirmar venta')) return;
+
+function abrirModalPagoPub() {
   const items=Object.entries(carritoPublico).filter(([,i])=>i.cantidad>0);
   if(!items.length){showToast('Agrega productos primero','err');return;}
   const total=items.reduce((s,[,i])=>s+i.precio*i.cantidad,0);
-  const modal=document.getElementById('modal-pago-pub'); if(!modal) return;
+  const modal=document.getElementById('modal-pago-pub');
+  if(!modal) return;
+
   document.getElementById('pago-pub-items').innerHTML=
     items.map(([,i])=>`<div class="checkout-row"><span>${i.nombre} x${i.cantidad}</span><span>S/. ${(i.precio*i.cantidad).toFixed(2)}</span></div>`).join('')+
     `<div class="checkout-row checkout-total"><span>TOTAL</span><span>S/. ${total.toFixed(2)}</span></div>`;
+
   let metodoPub='Efectivo';
   modal.querySelectorAll('.metodo-btn').forEach(btn=>{
     btn.classList.remove('active');
     if(btn.dataset.metodo==='Efectivo') btn.classList.add('active');
-    btn.onclick=()=>{modal.querySelectorAll('.metodo-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');metodoPub=btn.dataset.metodo;document.getElementById('efectivo-pub-section').style.display=metodoPub==='Efectivo'?'block':'none';};
+    btn.onclick=()=>{
+      modal.querySelectorAll('.metodo-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active'); metodoPub=btn.dataset.metodo;
+      document.getElementById('efectivo-pub-section').style.display=metodoPub==='Efectivo'?'block':'none';
+    };
   });
+
   const ef=document.getElementById('efectivo-pub-recibido');
-  if(ef){ef.value=total.toFixed(2);ef.oninput=()=>{const v=Math.max(0,parseFloat(ef.value||0)-total);document.getElementById('vuelto-pub').textContent=`S/. ${v.toFixed(2)}`;};}
+  if(ef){
+    ef.value=total.toFixed(2);
+    ef.oninput=()=>{
+      const v=Math.max(0,parseFloat(ef.value||0)-total);
+      document.getElementById('vuelto-pub').textContent=`S/. ${v.toFixed(2)}`;
+    };
+  }
+
   document.getElementById('btn-confirmar-pago-pub').onclick=async()=>{
     const recibido=parseFloat(document.getElementById('efectivo-pub-recibido')?.value)||total;
     const vuelto=metodoPub==='Efectivo'?Math.max(0,recibido-total):0;
@@ -710,25 +642,55 @@ function abrirModalPagoPub(){
   };
   openModal('modal-pago-pub');
 }
-async function procesarVentaPublica(items,total,metodoPago,vuelto){
+
+async function procesarVentaPublica(items,total,metodoPago,vuelto) {
   const detalle=items.map(([,i])=>`${i.cantidad}x ${i.nombre}`).join(', ');
   const lineas=items.map(([,i])=>({nombre:i.nombre,cantidad:i.cantidad,precio_unit:i.precio,subtotal:i.precio*i.cantidad}));
-  for(const [prodId,info] of items) await sb.rpc('descontar_stock',{p_producto_id:parseInt(prodId),p_cantidad:info.cantidad});
-  const { data:venta } = await sb.from('ventas_publicas').insert({total,detalle,metodo_pago:metodoPago,lineas_json:JSON.stringify(lineas),usuario_id:currentUserProfile?.id,caja_id:cajaActual?.id}).select().single();
-  await sb.from('movimientos_caja').insert({caja_id:cajaActual.id,concepto:`Venta pública: ${detalle}`,tipo:'ingreso',monto:total,usuario_id:currentUserProfile?.id});
+
+  // Descontar stock
+  for(const [prodId,info] of items){
+    await sb.rpc('descontar_stock',{p_producto_id:parseInt(prodId),p_cantidad:info.cantidad});
+  }
+
+  // Insertar venta
+  const { data:venta } = await sb.from('ventas_publicas').insert({
+    total,detalle,metodo_pago:metodoPago,
+    lineas_json:JSON.stringify(lineas),
+    usuario_id:currentUserProfile?.id,caja_id:cajaActual?.id,
+  }).select().single();
+
+  if(cajaActual){
+    await sb.from('movimientos_caja').insert({
+      caja_id:cajaActual.id,concepto:`Venta pública: ${detalle}`,
+      tipo:'ingreso',monto:total,usuario_id:currentUserProfile?.id,
+    });
+  }
+
+  // Serie y comprobante
   const serie=await getSiguienteSerie('PUB');
   const cajero=currentUserProfile?.nombre||'—';
-  const cajaNombre=`Caja #${cajaActual.id}`;
-  const datosTicket={serie,items,total,metodoPago,vuelto,cajero,caja:cajaNombre,fecha:new Date().toISOString()};
-  await registrarComprobante({serie,tipo:'PUB',descripcion:detalle,cliente:'Cliente General',total,metodo_pago:metodoPago,datos_json:datosTicket,venta_publica_id:venta?.id});
+  const cajaNombre=cajaActual?`Caja #${cajaActual.id}`:'Sin caja';
+  const datosTicket={ serie,items,total,metodoPago,vuelto,cajero,caja:cajaNombre,fecha:new Date().toISOString() };
+
+  await registrarComprobante({
+    serie,tipo:'PUB',descripcion:detalle,cliente:'Cliente General',
+    total,metodo_pago:metodoPago,datos_json:datosTicket,venta_publica_id:venta?.id,
+  });
+
   imprimirTicketTienda(datosTicket);
-  carritoPublico={}; renderTotalPublico(); document.querySelectorAll('.pq-carrito').forEach(el=>el.textContent='');
-  showToast(`✅ Venta S/. ${total.toFixed(2)} registrada`,'ok'); await loadVentasHoy();
+
+  carritoPublico={};
+  renderTotalPublico();
+  document.querySelectorAll('.pq-carrito').forEach(el=>el.textContent='');
+  showToast(`✅ Venta S/. ${total.toFixed(2)} registrada`,'ok');
+  await loadVentasHoy();
 }
 
+// ── Products quick grid ────────────────────────────────────
 async function loadProductsQuick(containerId,isPublic=false){
   const { data:prods } = await sb.from('productos').select('*').eq('activo',true).order('nombre');
-  const container=document.getElementById(containerId); if(!container) return;
+  const container=document.getElementById(containerId);
+  if(!container) return;
   container.innerHTML=prods?.length
     ?prods.map(p=>`
         <div class="product-quick-card ${p.stock<=0?'no-stock':''}"
@@ -742,27 +704,32 @@ async function loadProductsQuick(containerId,isPublic=false){
 }
 
 // ══════════════════════════════════════════════════════════
-//  ALMACÉN
+//  ALMACÉN — sin precio compra, con ajuste stock
 // ══════════════════════════════════════════════════════════
 async function loadAlmacen(){
   const { data:prods } = await sb.from('productos').select('*').order('nombre');
+  const stats=document.getElementById('almacen-stats');
   const sinStock=prods?.filter(p=>p.stock<=0).length||0;
   const stockBajo=prods?.filter(p=>p.stock>0&&p.stock<=(p.stock_minimo||5)).length||0;
-  document.getElementById('almacen-stats').innerHTML=`
+  stats.innerHTML=`
     <div class="stat-card-sys"><p>Total productos</p><h3>${prods?.length||0}</h3></div>
     <div class="stat-card-sys" style="border-left-color:#dc2626"><p>Sin stock</p><h3>${sinStock}</h3></div>
     <div class="stat-card-sys" style="border-left-color:#ca8a04"><p>Stock bajo</p><h3>${stockBajo}</h3></div>
     <div class="stat-card-sys" style="border-left-color:#16a34a"><p>Activos</p><h3>${prods?.filter(p=>p.activo).length||0}</h3></div>`;
+
   document.getElementById('products-table').innerHTML=prods?.length
     ?prods.map(p=>`<tr>
         <td>${p.codigo||'—'}</td><td><strong>${p.nombre}</strong></td><td>${p.categoria||'—'}</td>
-        <td>S/. ${p.precio_venta?.toFixed(2)||'0.00'}</td><td><strong>${p.stock}</strong></td><td>${p.stock_minimo||5}</td>
+        <td>S/. ${p.precio_venta?.toFixed(2)||'0.00'}</td>
+        <td><strong>${p.stock}</strong></td><td>${p.stock_minimo||5}</td>
         <td><span class="badge ${p.stock<=0?'badge-rojo':p.stock<=(p.stock_minimo||5)?'badge-amarillo':'badge-verde'}">${p.stock<=0?'Sin stock':p.stock<=(p.stock_minimo||5)?'Stock bajo':'OK'}</span></td>
         <td>
           <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="editProduct(${p.id})">Editar</button>
           <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="toggleProduct(${p.id},${!p.activo})">${p.activo?'Desact.':'Activar'}</button>
-        </td></tr>`).join('')
+        </td>
+      </tr>`).join('')
     :'<tr><td colspan="8" class="empty-row">No hay productos</td></tr>';
+
   const btnAdd=document.getElementById('btn-add-product');
   if(btnAdd) btnAdd.onclick=()=>{
     document.getElementById('prod-id').value='';
@@ -775,6 +742,7 @@ async function loadAlmacen(){
     openModal('modal-producto');
   };
 }
+
 async function editProduct(id){
   const { data:p } = await sb.from('productos').select('*').eq('id',id).single();
   document.getElementById('prod-id').value=id;
@@ -784,90 +752,108 @@ async function editProduct(id){
   document.getElementById('prod-categoria').value=p.categoria||'otros';
   document.getElementById('prod-precio-venta').value=p.precio_venta||'';
   document.getElementById('prod-stock-min').value=p.stock_minimo||5;
+  // Mostrar sección ajuste stock
   document.getElementById('stock-edit-section').style.display='block';
   document.getElementById('stock-nuevo-section').style.display='none';
   document.getElementById('prod-stock-actual').textContent=p.stock;
   document.getElementById('prod-stock-ajuste').value='0';
   stockOp='+';
-  const btnS=document.getElementById('btn-stock-sumar');const btnR=document.getElementById('btn-stock-restar');
-  if(btnS) btnS.style.cssText='background:var(--gold);color:var(--charcoal)';
-  if(btnR) btnR.style.cssText='';
+  document.getElementById('btn-stock-sumar').style.background='var(--gold)';
+  document.getElementById('btn-stock-sumar').style.color='var(--charcoal)';
+  document.getElementById('btn-stock-restar').style.background='';
+  document.getElementById('btn-stock-restar').style.color='';
   actualizarPreviewStock(p.stock);
   openModal('modal-producto');
 }
+
 function actualizarPreviewStock(stockActual){
   const ajuste=parseInt(document.getElementById('prod-stock-ajuste')?.value)||0;
   const nuevo=stockOp==='+'?stockActual+ajuste:Math.max(0,stockActual-ajuste);
   const prev=document.getElementById('stock-resultado-preview');
   if(prev) prev.textContent=ajuste>0?`Stock resultante: ${nuevo} unidades`:'';
 }
+
 function setupModalProducto(){
-  const btnS=document.getElementById('btn-stock-sumar');
-  const btnR=document.getElementById('btn-stock-restar');
-  const inp=document.getElementById('prod-stock-ajuste');
-  btnS?.addEventListener('click',()=>{stockOp='+';btnS.style.cssText='background:var(--gold);color:var(--charcoal)';btnR.style.cssText='';actualizarPreviewStock(parseInt(document.getElementById('prod-stock-actual')?.textContent)||0);});
-  btnR?.addEventListener('click',()=>{stockOp='-';btnR.style.cssText='background:#dc2626;color:#fff';btnS.style.cssText='';actualizarPreviewStock(parseInt(document.getElementById('prod-stock-actual')?.textContent)||0);});
-  inp?.addEventListener('input',()=>actualizarPreviewStock(parseInt(document.getElementById('prod-stock-actual')?.textContent)||0));
+  const btnSumar=document.getElementById('btn-stock-sumar');
+  const btnRestar=document.getElementById('btn-stock-restar');
+  const inputAjuste=document.getElementById('prod-stock-ajuste');
+
+  btnSumar?.addEventListener('click',()=>{
+    stockOp='+';
+    btnSumar.style.cssText='background:var(--gold);color:var(--charcoal)';
+    btnRestar.style.cssText='';
+    const stockActual=parseInt(document.getElementById('prod-stock-actual')?.textContent)||0;
+    actualizarPreviewStock(stockActual);
+  });
+  btnRestar?.addEventListener('click',()=>{
+    stockOp='-';
+    btnRestar.style.cssText='background:#dc2626;color:#fff';
+    btnSumar.style.cssText='';
+    const stockActual=parseInt(document.getElementById('prod-stock-actual')?.textContent)||0;
+    actualizarPreviewStock(stockActual);
+  });
+  inputAjuste?.addEventListener('input',()=>{
+    const stockActual=parseInt(document.getElementById('prod-stock-actual')?.textContent)||0;
+    actualizarPreviewStock(stockActual);
+  });
+
   document.getElementById('btn-guardar-producto')?.addEventListener('click',async()=>{
     const id=document.getElementById('prod-id').value;
     const nombre=document.getElementById('prod-nombre').value.trim();
     if(!nombre){showToast('El nombre es obligatorio','err');return;}
-    const data={nombre,codigo:document.getElementById('prod-codigo').value.trim(),categoria:document.getElementById('prod-categoria').value,precio_venta:parseFloat(document.getElementById('prod-precio-venta').value)||0,stock_minimo:parseInt(document.getElementById('prod-stock-min').value)||5,activo:true};
+
+    const data={
+      nombre,
+      codigo:document.getElementById('prod-codigo').value.trim(),
+      categoria:document.getElementById('prod-categoria').value,
+      precio_venta:parseFloat(document.getElementById('prod-precio-venta').value)||0,
+      stock_minimo:parseInt(document.getElementById('prod-stock-min').value)||5,
+      activo:true,
+    };
+
     if(id){
-      const { data:pA } = await sb.from('productos').select('stock').eq('id',id).single();
-      const sA=pA?.stock||0;const aj=parseInt(inp.value)||0;
-      data.stock=stockOp==='+'?sA+aj:Math.max(0,sA-aj);
+      // Calcular nuevo stock con ajuste
+      const { data:pActual } = await sb.from('productos').select('stock').eq('id',id).single();
+      const stockActual=pActual?.stock||0;
+      const ajuste=parseInt(document.getElementById('prod-stock-ajuste').value)||0;
+      data.stock=stockOp==='+'?stockActual+ajuste:Math.max(0,stockActual-ajuste);
       await sb.from('productos').update(data).eq('id',id);
     } else {
       data.stock=parseInt(document.getElementById('prod-stock').value)||0;
       await sb.from('productos').insert(data);
     }
-    showToast('Producto guardado ✓','ok'); closeModal('modal-producto'); loadAlmacen();
+    showToast('Producto guardado ✓','ok');
+    closeModal('modal-producto'); loadAlmacen();
   });
 }
-async function toggleProduct(id,estado){await sb.from('productos').update({activo:estado}).eq('id',id);showToast('Actualizado','ok');loadAlmacen();}
+
+async function toggleProduct(id,estado){
+  await sb.from('productos').update({activo:estado}).eq('id',id);
+  showToast('Actualizado','ok'); loadAlmacen();
+}
 
 // ══════════════════════════════════════════════════════════
-//  CAJAS — con histórico por fecha y ticket de cierre
+//  CAJAS
 // ══════════════════════════════════════════════════════════
 async function loadCajas(){
   const hoy=new Date().toISOString().split('T')[0];
-  // Inicializar filtro de fecha si no tiene valor
-  const fecInput=document.getElementById('caja-hist-fecha');
-  if(fecInput&&!fecInput.value) fecInput.value=hoy;
-  const fechaFiltro=fecInput?.value||hoy;
-  document.getElementById('caja-fecha').textContent=fechaFiltro;
-
-  const { data:cajas } = await sb.from('cajas').select('*, usuarios(nombre)').eq('fecha',fechaFiltro).order('created_at');
-
-  // Actualizar cajaActual si es hoy
-  if(fechaFiltro===hoy) cajaActual=cajas?.find(c=>c.usuario_id===currentUserProfile?.id&&c.estado==='abierta')||cajaActual||null;
-
+  const { data:cajas } = await sb.from('cajas').select('*, usuarios(nombre)').eq('fecha',hoy).order('created_at');
+  cajaActual=cajas?.find(c=>c.usuario_id===currentUserProfile?.id&&c.estado==='abierta')||null;
   const grid=document.getElementById('cajas-grid');
   grid.innerHTML=cajas?.length
     ?cajas.map(c=>`
         <div class="caja-card ${c.estado==='abierta'?'caja-abierta':'caja-cerrada'}">
           <h4>${c.usuarios?.nombre||'—'}</h4>
-          <div class="caja-user">📅 ${c.fecha} | ${c.estado}</div>
+          <div class="caja-user">📅 ${hoy} | ${c.estado}</div>
           <div class="caja-total">S/. ${(c.total||0).toFixed(2)}</div>
           <div class="caja-sub">Apertura: ${formatTime(c.created_at)}</div>
-          <div class="caja-actions">
-            ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id&&fechaFiltro===hoy
-              ?`<button class="sys-btn sys-btn-outline sys-btn-sm" onclick="cerrarCaja(${c.id})">Cerrar caja</button>`:''}
-            <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="verDetalleCaja(${c.id})">Ver detalle</button>
-            <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="imprimirCaja(${c.id})">🖨 Ticket</button>
-          </div>
+          ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id
+            ?`<button class="sys-btn sys-btn-outline sys-btn-sm" style="margin-top:10px" onclick="cerrarCaja(${c.id})">Cerrar caja</button>`:''}
         </div>`).join('')
-    :'<p style="color:var(--text-light)">No hay cajas en esta fecha.</p>';
-
+    :'<p style="color:var(--text-light)">No hay cajas hoy. Abre tu caja para comenzar.</p>';
   const btnAbrir=document.getElementById('btn-abrir-caja');
   if(btnAbrir) btnAbrir.onclick=abrirCaja;
-
-  // Bind filtro fecha
-  if(fecInput&&!fecInput._bound){fecInput._bound=true;fecInput.addEventListener('change',loadCajas);}
-
-  // Mostrar movimientos de la caja activa del usuario para HOY
-  if(cajaActual&&fechaFiltro===hoy){
+  if(cajaActual){
     const { data:movs } = await sb.from('movimientos_caja').select('*').eq('caja_id',cajaActual.id).order('created_at',{ascending:false});
     const tbody=document.getElementById('caja-movimientos');
     tbody.innerHTML=movs?.length
@@ -875,42 +861,6 @@ async function loadCajas(){
       :'<tr><td colspan="4" class="empty-row">Sin movimientos</td></tr>';
   }
 }
-
-async function verDetalleCaja(cajaId){
-  const { data:movs } = await sb.from('movimientos_caja').select('*').eq('caja_id',cajaId).order('created_at',{ascending:false});
-  const tbody=document.getElementById('caja-movimientos');
-  tbody.innerHTML=movs?.length
-    ?movs.map(m=>`<tr><td>${formatTime(m.created_at)}</td><td>${m.concepto}</td><td><span class="badge ${m.tipo==='ingreso'?'badge-verde':'badge-rojo'}">${m.tipo}</span></td><td>S/. ${m.monto?.toFixed(2)}</td></tr>`).join('')
-    :'<tr><td colspan="4" class="empty-row">Sin movimientos</td></tr>';
-  document.getElementById('caja-movimientos').scrollIntoView({behavior:'smooth'});
-}
-
-async function imprimirCaja(cajaId){
-  const { data:caja } = await sb.from('cajas').select('*, usuarios(nombre)').eq('id',cajaId).single();
-  const { data:movs } = await sb.from('movimientos_caja').select('*').eq('caja_id',cajaId).order('created_at',{ascending:false});
-
-  // Calcular resumen por método de pago
-  const resumenMetodos={};
-  movs?.filter(m=>m.tipo==='ingreso').forEach(m=>{
-    // Extraer método del concepto
-    let met='Varios';
-    if(m.concepto?.includes('Efectivo')) met='Efectivo';
-    else if(m.concepto?.includes('Tarjeta')) met='Tarjeta';
-    else if(m.concepto?.includes('Yape')) met='Yape';
-    else if(m.concepto?.includes('Plin')) met='Plin';
-    resumenMetodos[met]=(resumenMetodos[met]||0)+(m.monto||0);
-  });
-
-  const serie=await getSiguienteSerie('CAJA');
-  const datosTicket={
-    serie, caja:`#${cajaId}`, usuario:caja?.usuarios?.nombre||'—',
-    fecha:caja?.fecha, estado:caja?.estado,
-    movimientos:movs||[], resumenMetodos, totalGeneral:caja?.total||0
-  };
-  await registrarComprobante({serie,tipo:'CAJA',descripcion:`Resumen caja #${cajaId}`,cliente:'—',total:caja?.total||0,metodo_pago:'Varios',datos_json:datosTicket});
-  imprimirTicketCaja(datosTicket);
-}
-
 async function abrirCaja(){
   if(cajaActual){showToast('Ya tienes una caja abierta','err');return;}
   const hoy=new Date().toISOString().split('T')[0];
@@ -919,12 +869,11 @@ async function abrirCaja(){
 }
 async function cerrarCaja(id){
   await sb.from('cajas').update({estado:'cerrada'}).eq('id',id);
-  if(cajaActual?.id===id) cajaActual=null;
-  showToast('Caja cerrada ✓','ok'); loadCajas();
+  cajaActual=null; showToast('Caja cerrada ✓','ok'); loadCajas();
 }
 
 // ══════════════════════════════════════════════════════════
-//  REPORTES
+//  REPORTES — separados correctamente
 // ══════════════════════════════════════════════════════════
 function initReportes(){
   const hoy=new Date();
@@ -938,35 +887,83 @@ async function generarReporte(){
   const desde=document.getElementById('reporte-desde').value;
   const hasta=document.getElementById('reporte-hasta').value;
   if(!desde||!hasta){showToast('Selecciona el rango de fechas','err');return;}
-  const desdeTS=desde+'T00:00:00',hastaTS=hasta+'T23:59:59';
-  const { data:checkins } = await sb.from('check_ins').select('*, habitaciones(numero,categoria), clientes(nombre)').gte('check_in_fecha',desde).lte('check_in_fecha',hasta).order('check_in_fecha',{ascending:false});
-  const { data:consumosHab } = await sb.from('consumos_habitacion').select('*, productos(nombre)').gte('created_at',desdeTS).lte('created_at',hastaTS);
-  const { data:ventasPub } = await sb.from('ventas_publicas').select('*').gte('created_at',desdeTS).lte('created_at',hastaTS).order('created_at',{ascending:false});
-  const totalHabTotal=checkins?.reduce((s,c)=>s+(c.total_cobrado||0),0)||0;
+  const desdeTS=desde+'T00:00:00', hastaTS=hasta+'T23:59:59';
+
+  // ── Habitaciones: check-ins + consumos de habitación ──
+  const { data:checkins } = await sb.from('check_ins')
+    .select('*, habitaciones(numero,categoria), clientes(nombre)')
+    .gte('check_in_fecha',desde).lte('check_in_fecha',hasta)
+    .order('check_in_fecha',{ascending:false});
+
+  // Consumos de habitación en el período
+  const { data:consumosHab } = await sb.from('consumos_habitacion')
+    .select('*, productos(nombre)').gte('created_at',desdeTS).lte('created_at',hastaTS);
+
+  // ── Tienda pública únicamente ──
+  const { data:ventasPub } = await sb.from('ventas_publicas')
+    .select('*').gte('created_at',desdeTS).lte('created_at',hastaTS)
+    .order('created_at',{ascending:false});
+
+  // Totales
+  const totalHabBase=checkins?.reduce((s,c)=>s+(c.total_cobrado||0),0)||0;
+  const totalConsumosHab=consumosHab?.reduce((s,c)=>s+(c.precio_total||0),0)||0;
+  const totalHabTotal=totalHabBase; // total_cobrado ya incluye consumos
   const totalVentasPub=ventasPub?.reduce((s,v)=>s+(v.total||0),0)||0;
+  const totalGeneral=totalHabTotal+totalVentasPub;
+
   document.getElementById('reporte-stats').innerHTML=`
     <div class="stat-card-sys"><p>Check-ins período</p><h3>${checkins?.length||0}</h3></div>
-    <div class="stat-card-sys"><p>Ingresos Habitaciones</p><h3>S/. ${totalHabTotal.toFixed(2)}</h3><small>Incluye consumos</small></div>
+    <div class="stat-card-sys"><p>Ingresos Habitaciones</p><h3>S/. ${totalHabTotal.toFixed(2)}</h3><small>Incluye consumos x hab.</small></div>
     <div class="stat-card-sys"><p>Ingresos Tienda Pública</p><h3>S/. ${totalVentasPub.toFixed(2)}</h3></div>
-    <div class="stat-card-sys" style="border-left-color:#16a34a"><p>TOTAL GENERAL</p><h3>S/. ${(totalHabTotal+totalVentasPub).toFixed(2)}</h3></div>`;
-  // Habitaciones
+    <div class="stat-card-sys" style="border-left-color:#16a34a"><p>TOTAL GENERAL</p><h3>S/. ${totalGeneral.toFixed(2)}</h3></div>`;
+
+  // ── Tabla: Ingresos por Habitaciones + Consumos ──
   const groupHab={};
-  checkins?.forEach(c=>{const k=c.habitaciones?.numero||'?';if(!groupHab[k])groupHab[k]={numero:k,categoria:c.habitaciones?.categoria,noches:0,total:0};if(c.check_out_real)groupHab[k].noches+=Math.ceil((new Date(c.check_out_real)-new Date(c.check_in_fecha))/(1000*60*60*24));groupHab[k].total+=c.total_cobrado||0;});
+  checkins?.forEach(c=>{
+    const k=c.habitaciones?.numero||'?';
+    if(!groupHab[k]) groupHab[k]={numero:k,categoria:c.habitaciones?.categoria,noches:0,totalHab:0,totalConsumos:0};
+    if(c.check_out_real){
+      groupHab[k].noches+=Math.ceil((new Date(c.check_out_real)-new Date(c.check_in_fecha))/(1000*60*60*24));
+    }
+    groupHab[k].totalHab+=c.total_cobrado||0;
+  });
+  // Consumos por habitación
+  consumosHab?.forEach(async()=>{}); // solo para referencia, ya están en total_cobrado
+
   document.getElementById('reporte-habitaciones').innerHTML=Object.values(groupHab).length
-    ?Object.values(groupHab).map(h=>`<tr><td>Hab. ${String(h.numero).padStart(3,'0')} (${CATEGORIA_LABELS[h.categoria]||h.categoria})</td><td>${h.noches}</td><td>S/. ${h.total.toFixed(2)}</td></tr>`).join('')
+    ?Object.values(groupHab).map(h=>`<tr>
+        <td>Hab. ${String(h.numero).padStart(3,'0')} (${h.categoria})</td>
+        <td>${h.noches}</td>
+        <td>S/. ${h.totalHab.toFixed(2)}</td>
+      </tr>`).join('')
     :'<tr><td colspan="3" class="empty-row">Sin datos</td></tr>';
-  // Tienda pública
+
+  // ── Tabla: Tienda Pública — por producto ──
   const groupPub={};
-  ventasPub?.forEach(v=>{try{const ls=JSON.parse(v.lineas_json||'[]');ls.forEach(l=>{if(!groupPub[l.nombre])groupPub[l.nombre]={nombre:l.nombre,cantidad:0,total:0};groupPub[l.nombre].cantidad+=l.cantidad;groupPub[l.nombre].total+=l.subtotal||0;});}catch(e){if(!groupPub['Varios'])groupPub['Varios']={nombre:'Varios',cantidad:0,total:0};groupPub['Varios'].cantidad++;groupPub['Varios'].total+=v.total||0;}});
+  ventasPub?.forEach(v=>{
+    try {
+      const lineas=JSON.parse(v.lineas_json||'[]');
+      lineas.forEach(l=>{
+        if(!groupPub[l.nombre]) groupPub[l.nombre]={nombre:l.nombre,cantidad:0,total:0};
+        groupPub[l.nombre].cantidad+=l.cantidad;
+        groupPub[l.nombre].total+=l.subtotal||0;
+      });
+    } catch(e) {
+      if(!groupPub['Varios']) groupPub['Varios']={nombre:'Varios',cantidad:0,total:0};
+      groupPub['Varios'].cantidad++;
+      groupPub['Varios'].total+=v.total||0;
+    }
+  });
   document.getElementById('reporte-ventas').innerHTML=Object.values(groupPub).length
     ?Object.values(groupPub).sort((a,b)=>b.total-a.total).map(p=>`<tr><td>${p.nombre}</td><td>${p.cantidad}</td><td>S/. ${p.total.toFixed(2)}</td></tr>`).join('')
     :'<tr><td colspan="3" class="empty-row">Sin ventas en tienda pública</td></tr>';
-  // Detalle checkins
+
+  // ── Detalle checkins ──
   document.getElementById('reporte-checkins').innerHTML=checkins?.length
     ?checkins.map(c=>{
         const noches=c.check_out_real?Math.ceil((new Date(c.check_out_real)-new Date(c.check_in_fecha))/(1000*60*60*24)):'—';
         const costoHab=noches!=='—'?noches*(c.precio_noche||0):0;
-        const consumos=Math.max(0,(c.total_cobrado||0)-costoHab);
+        const consumos=(c.total_cobrado||0)-costoHab;
         return `<tr>
           <td class="sm">${c.serie_comprobante||'—'}</td>
           <td>${String(c.habitaciones?.numero||'?').padStart(3,'0')}</td>
@@ -975,10 +972,11 @@ async function generarReporte(){
           <td>${c.check_out_real?formatDate(c.check_out_real):'<span class="badge badge-verde">Activo</span>'}</td>
           <td>${noches}</td>
           <td>S/. ${costoHab.toFixed(2)}</td>
-          <td>S/. ${consumos.toFixed(2)}</td>
+          <td>S/. ${consumos>0?consumos.toFixed(2):'0.00'}</td>
           <td>${c.metodo_pago||'—'}</td>
           <td>S/. ${c.total_cobrado?.toFixed(2)||'—'}</td>
-        </tr>`;}).join('')
+        </tr>`;
+      }).join('')
     :'<tr><td colspan="10" class="empty-row">Sin datos</td></tr>';
 }
 
@@ -991,6 +989,7 @@ async function loadComprobantes(){
   const fh=document.getElementById('filter-comp-hasta');
   if(fd&&!fd.value) fd.value=hoy;
   if(fh&&!fh.value) fh.value=hoy;
+
   if(!document.getElementById('btn-filtrar-comp')._bound){
     document.getElementById('btn-filtrar-comp')._bound=true;
     document.getElementById('btn-filtrar-comp').addEventListener('click',filtrarComprobantes);
@@ -999,33 +998,42 @@ async function loadComprobantes(){
   }
   await filtrarComprobantes();
 }
+
 async function filtrarComprobantes(){
   const desde=(document.getElementById('filter-comp-desde')?.value||new Date().toISOString().split('T')[0])+'T00:00:00';
   const hasta=(document.getElementById('filter-comp-hasta')?.value||new Date().toISOString().split('T')[0])+'T23:59:59';
   const tipo=document.getElementById('filter-comp-tipo')?.value||'';
   const q=document.getElementById('search-comprobante')?.value.trim()||'';
-  let query=sb.from('comprobantes').select('*, usuarios(nombre)').gte('created_at',desde).lte('created_at',hasta).order('created_at',{ascending:false});
+
+  let query=sb.from('comprobantes').select('*, usuarios(nombre)')
+    .gte('created_at',desde).lte('created_at',hasta)
+    .order('created_at',{ascending:false});
   if(tipo) query=query.eq('tipo_serie',tipo);
   if(q)    query=query.ilike('serie',`%${q}%`);
+
   const { data:comps } = await query;
+
+  // Stats
   const totalMonto=comps?.reduce((s,c)=>s+(c.total||0),0)||0;
   document.getElementById('comp-stats').innerHTML=`
     <div class="stat-card-sys"><p>Comprobantes emitidos</p><h3>${comps?.length||0}</h3></div>
     <div class="stat-card-sys"><p>Hab. / Check-outs</p><h3>${comps?.filter(c=>c.tipo_serie==='HAB').length||0}</h3></div>
     <div class="stat-card-sys"><p>Tienda pública</p><h3>${comps?.filter(c=>c.tipo_serie==='PUB').length||0}</h3></div>
     <div class="stat-card-sys" style="border-left-color:#16a34a"><p>Total emitido</p><h3>S/. ${totalMonto.toFixed(2)}</h3></div>`;
+
   document.getElementById('comprobantes-table').innerHTML=comps?.length
     ?comps.map(c=>`<tr>
         <td><span class="badge badge-gold" style="font-size:11px">${c.serie}</span></td>
-        <td><span class="badge ${c.tipo_serie==='HAB'?'badge-celeste':c.tipo_serie==='CAJA'?'badge-amarillo':'badge-verde'}">${{HAB:'Habitación',PUB:'Tienda',CAJA:'Caja'}[c.tipo_serie]||c.tipo_serie}</span></td>
+        <td><span class="badge ${c.tipo_serie==='HAB'?'badge-celeste':'badge-verde'}">${c.tipo_serie==='HAB'?'Habitación':'Tienda'}</span></td>
         <td>${formatDate(c.created_at)} ${formatTime(c.created_at)}</td>
-        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.cliente||'—'}<br><span style="font-size:10px;color:var(--text-light)">${c.descripcion||''}</span></td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.cliente||'—'}<br><span style="font-size:10px;color:var(--text-light)">${c.descripcion||''}</span></td>
         <td>${c.metodo_pago||'—'}</td>
         <td><strong>S/. ${c.total?.toFixed(2)}</strong></td>
         <td><button class="sys-btn sys-btn-outline sys-btn-sm" onclick="reimprimirComp(${c.id})">🖨 Reimprimir</button></td>
       </tr>`).join('')
     :'<tr><td colspan="7" class="empty-row">No hay comprobantes en este rango</td></tr>';
 }
+
 async function reimprimirComp(id){
   const { data:comp } = await sb.from('comprobantes').select('*').eq('id',id).single();
   if(!comp){showToast('Comprobante no encontrado','err');return;}
@@ -1041,25 +1049,40 @@ async function loadClientes(){
   if(q) query=query.or(`nombre.ilike.%${q}%,dni.ilike.%${q}%`);
   const { data:clientes } = await query;
   document.getElementById('clientes-table').innerHTML=clientes?.length
-    ?clientes.map(c=>`<tr><td><strong>${c.nombre}</strong></td><td>${c.dni||'—'}</td><td>${c.telefono||'—'}</td><td>${c.email||'—'}</td><td>${c.ultima_estancia?formatDate(c.ultima_estancia):'—'}</td><td>—</td><td><button class="sys-btn sys-btn-outline sys-btn-sm" onclick="editCliente(${c.id})">Editar</button></td></tr>`).join('')
+    ?clientes.map(c=>`<tr>
+        <td><strong>${c.nombre}</strong></td><td>${c.dni||'—'}</td><td>${c.telefono||'—'}</td>
+        <td>${c.email||'—'}</td><td>${c.ultima_estancia?formatDate(c.ultima_estancia):'—'}</td><td>—</td>
+        <td><button class="sys-btn sys-btn-outline sys-btn-sm" onclick="editCliente(${c.id})">Editar</button></td>
+      </tr>`).join('')
     :'<tr><td colspan="7" class="empty-row">Sin clientes</td></tr>';
   const inp=document.getElementById('search-cliente');
   if(inp&&!inp._bound){inp._bound=true;inp.addEventListener('input',loadClientes);}
   const btnAdd=document.getElementById('btn-add-cliente');
-  if(btnAdd) btnAdd.onclick=()=>{document.getElementById('cli-id').value='';document.getElementById('modal-cli-title').textContent='Nuevo cliente';['cli-nombre','cli-dni','cli-tel','cli-email','cli-obs'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});openModal('modal-cliente');};
+  if(btnAdd) btnAdd.onclick=()=>{
+    document.getElementById('cli-id').value='';
+    document.getElementById('modal-cli-title').textContent='Nuevo cliente';
+    ['cli-nombre','cli-dni','cli-tel','cli-email','cli-obs'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    openModal('modal-cliente');
+  };
 }
 async function editCliente(id){
   const { data:c } = await sb.from('clientes').select('*').eq('id',id).single();
-  document.getElementById('cli-id').value=id;document.getElementById('modal-cli-title').textContent='Editar cliente';
-  document.getElementById('cli-nombre').value=c.nombre||'';document.getElementById('cli-dni').value=c.dni||'';document.getElementById('cli-tel').value=c.telefono||'';document.getElementById('cli-email').value=c.email||'';document.getElementById('cli-obs').value=c.observaciones||'';
+  document.getElementById('cli-id').value=id;
+  document.getElementById('modal-cli-title').textContent='Editar cliente';
+  document.getElementById('cli-nombre').value=c.nombre||'';
+  document.getElementById('cli-dni').value=c.dni||'';
+  document.getElementById('cli-tel').value=c.telefono||'';
+  document.getElementById('cli-email').value=c.email||'';
+  document.getElementById('cli-obs').value=c.observaciones||'';
   openModal('modal-cliente');
 }
 document.getElementById('btn-guardar-cliente')?.addEventListener('click',async()=>{
   const id=document.getElementById('cli-id').value;
   const data={nombre:document.getElementById('cli-nombre').value.trim(),dni:document.getElementById('cli-dni').value.trim(),telefono:document.getElementById('cli-tel').value.trim(),email:document.getElementById('cli-email').value.trim(),observaciones:document.getElementById('cli-obs').value.trim()};
   if(!data.nombre){showToast('Nombre obligatorio','err');return;}
-  if(id) await sb.from('clientes').update(data).eq('id',id); else await sb.from('clientes').insert(data);
-  showToast('Cliente guardado ✓','ok');closeModal('modal-cliente');loadClientes();
+  if(id) await sb.from('clientes').update(data).eq('id',id);
+  else   await sb.from('clientes').insert(data);
+  showToast('Cliente guardado ✓','ok'); closeModal('modal-cliente'); loadClientes();
 });
 
 // ══════════════════════════════════════════════════════════
@@ -1068,19 +1091,44 @@ document.getElementById('btn-guardar-cliente')?.addEventListener('click',async()
 async function loadUsuarios(){
   const { data:users } = await sb.from('usuarios').select('*').order('nombre');
   document.getElementById('users-table').innerHTML=users?.length
-    ?users.map(u=>`<tr><td><strong>${u.nombre}</strong></td><td>${u.email||'—'}</td><td><span class="badge badge-gold">${rolLabel(u.rol)}</span></td><td><span class="badge ${u.activo?'badge-verde':'badge-rojo'}">${u.activo?'Activo':'Inactivo'}</span></td><td>${u.ultimo_acceso?formatDate(u.ultimo_acceso):'Nunca'}</td><td><button class="sys-btn sys-btn-outline sys-btn-sm" onclick="editUsuario(${u.id})">Editar rol</button><button class="sys-btn sys-btn-outline sys-btn-sm" onclick="toggleUsuario(${u.id},${!u.activo})">${u.activo?'Desact.':'Activar'}</button></td></tr>`).join('')
+    ?users.map(u=>`<tr>
+        <td><strong>${u.nombre}</strong></td><td>${u.email||'—'}</td>
+        <td><span class="badge badge-gold">${rolLabel(u.rol)}</span></td>
+        <td><span class="badge ${u.activo?'badge-verde':'badge-rojo'}">${u.activo?'Activo':'Inactivo'}</span></td>
+        <td>${u.ultimo_acceso?formatDate(u.ultimo_acceso):'Nunca'}</td>
+        <td>
+          <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="editUsuario(${u.id})">Editar rol</button>
+          <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="toggleUsuario(${u.id},${!u.activo})">${u.activo?'Desactivar':'Activar'}</button>
+        </td>
+      </tr>`).join('')
     :'<tr><td colspan="6" class="empty-row">Sin usuarios</td></tr>';
   const btnAdd=document.getElementById('btn-add-user');
-  if(btnAdd) btnAdd.onclick=()=>{document.getElementById('usr-id').value='';['usr-nombre','usr-email','usr-password'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('usr-rol').value='recepcionista';document.getElementById('modal-usuario-title').textContent='Nuevo usuario';document.getElementById('usr-password-group').style.display='block';openModal('modal-usuario');};
+  if(btnAdd) btnAdd.onclick=()=>{
+    document.getElementById('usr-id').value='';
+    ['usr-nombre','usr-email','usr-password'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    document.getElementById('usr-rol').value='recepcionista';
+    document.getElementById('modal-usuario-title').textContent='Nuevo usuario';
+    document.getElementById('usr-password-group').style.display='block';
+    openModal('modal-usuario');
+  };
 }
 async function editUsuario(id){
   const { data:u } = await sb.from('usuarios').select('*').eq('id',id).single();
-  document.getElementById('usr-id').value=id;document.getElementById('modal-usuario-title').textContent='Editar usuario';document.getElementById('usr-nombre').value=u.nombre||'';document.getElementById('usr-email').value=u.email||'';document.getElementById('usr-rol').value=u.rol||'recepcionista';document.getElementById('usr-password-group').style.display='none';
+  document.getElementById('usr-id').value=id;
+  document.getElementById('modal-usuario-title').textContent='Editar usuario';
+  document.getElementById('usr-nombre').value=u.nombre||'';
+  document.getElementById('usr-email').value=u.email||'';
+  document.getElementById('usr-rol').value=u.rol||'recepcionista';
+  document.getElementById('usr-password-group').style.display='none';
   openModal('modal-usuario');
 }
-async function toggleUsuario(id,estado){await sb.from('usuarios').update({activo:estado}).eq('id',id);showToast('Actualizado','ok');loadUsuarios();}
+async function toggleUsuario(id,estado){
+  await sb.from('usuarios').update({activo:estado}).eq('id',id);
+  showToast('Usuario actualizado','ok'); loadUsuarios();
+}
 function setupModalUsuario(){
-  const btn=document.getElementById('btn-guardar-usuario');if(!btn)return;
+  const btn=document.getElementById('btn-guardar-usuario');
+  if(!btn) return;
   btn.addEventListener('click',async()=>{
     const id=document.getElementById('usr-id').value;
     const nombre=document.getElementById('usr-nombre').value.trim();
@@ -1088,17 +1136,36 @@ function setupModalUsuario(){
     const password=document.getElementById('usr-password')?.value;
     const rol=document.getElementById('usr-rol').value;
     if(!nombre||!email){showToast('Nombre y email obligatorios','err');return;}
-    if(id){await sb.from('usuarios').update({nombre,rol}).eq('id',id);showToast('Usuario actualizado ✓','ok');}
-    else{
+    if(id){
+      await sb.from('usuarios').update({nombre,rol}).eq('id',id);
+      showToast('Usuario actualizado ✓','ok');
+    } else {
       if(!password||password.length<6){showToast('Contraseña mínimo 6 caracteres','err');return;}
       btn.disabled=true;btn.textContent='Creando...';
+      // Upsert en tabla (el admin debe crear el auth user desde Supabase dashboard)
+      // Intentamos crear via API admin si está disponible
       let authId=null;
-      try{const resp=await fetch(`${SUPABASE_URL}/auth/v1/admin/users`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${(await sb.auth.getSession()).data.session?.access_token}`},body:JSON.stringify({email,password,user_metadata:{nombre,rol},email_confirm:true})});const j=await resp.json();authId=j.id;}catch(e){}
-      if(authId){await sb.from('usuarios').upsert({auth_id:authId,nombre,email,rol,activo:true},{onConflict:'email'});showToast('✅ Usuario creado','ok');}
-      else{await sb.from('usuarios').upsert({nombre,email,rol,activo:true},{onConflict:'email'});showToast('⚠️ Perfil creado. Crea también el usuario en Supabase → Authentication → Add user.','ok');}
+      try {
+        const resp=await fetch(`${SUPABASE_URL}/auth/v1/admin/users`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${(await sb.auth.getSession()).data.session?.access_token}`},
+          body:JSON.stringify({email,password,user_metadata:{nombre,rol},email_confirm:true})
+        });
+        const j=await resp.json();
+        authId=j.id;
+      } catch(e){}
+
+      if(authId){
+        await sb.from('usuarios').upsert({auth_id:authId,nombre,email,rol,activo:true},{onConflict:'email'});
+        showToast('✅ Usuario creado correctamente','ok');
+      } else {
+        // Crear solo en tabla (el auth user debe crearse desde Supabase)
+        await sb.from('usuarios').upsert({nombre,email,rol,activo:true},{onConflict:'email'});
+        showToast('⚠️ Perfil creado. Crea el usuario en Supabase Dashboard → Authentication → Add user con este email y contraseña, luego ya podrá ingresar.','ok');
+      }
       btn.disabled=false;btn.textContent='Guardar usuario';
     }
-    closeModal('modal-usuario');loadUsuarios();
+    closeModal('modal-usuario'); loadUsuarios();
   });
 }
 
@@ -1107,17 +1174,23 @@ function setupModalUsuario(){
 // ══════════════════════════════════════════════════════════
 function setupModals(){
   document.querySelectorAll('.modal-close,[data-modal]').forEach(btn=>{
-    btn.addEventListener('click',()=>{const modalId=btn.dataset.modal||btn.closest('.sys-modal')?.id;if(modalId)closeModal(modalId);});
+    btn.addEventListener('click',()=>{
+      const modalId=btn.dataset.modal||btn.closest('.sys-modal')?.id;
+      if(modalId) closeModal(modalId);
+    });
   });
-  document.querySelectorAll('.sys-modal').forEach(modal=>{modal.addEventListener('click',e=>{if(e.target===modal)closeModal(modal.id);});});
+  document.querySelectorAll('.sys-modal').forEach(modal=>{
+    modal.addEventListener('click',e=>{if(e.target===modal) closeModal(modal.id);});
+  });
 }
-function openModal(id){const m=document.getElementById(id);if(m)m.style.display='flex';}
-function closeModal(id){const m=document.getElementById(id);if(m)m.style.display='none';}
+function openModal(id) { const m=document.getElementById(id);if(m)m.style.display='flex'; }
+function closeModal(id){ const m=document.getElementById(id);if(m)m.style.display='none'; }
 function showToast(msg,type='ok'){
-  const t=document.getElementById('sys-toast');if(!t)return;
-  t.textContent=msg;t.className=`sys-toast toast-${type}`;t.style.display='block';
-  clearTimeout(t._timer);t._timer=setTimeout(()=>{t.style.display='none';},5000);
+  const t=document.getElementById('sys-toast');
+  if(!t) return;
+  t.textContent=msg; t.className=`sys-toast toast-${type}`; t.style.display='block';
+  clearTimeout(t._timer); t._timer=setTimeout(()=>{t.style.display='none';},4500);
 }
-function formatDate(str){if(!str)return'—';return new Date(str).toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});}
-function formatTime(str){if(!str)return'—';return new Date(str).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});}
-function escStr(str){return(str||'').replace(/'/g,"\\'");}
+function formatDate(str){ if(!str) return '—'; return new Date(str).toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+function formatTime(str){ if(!str) return '—'; return new Date(str).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}); }
+function escStr(str){ return (str||'').replace(/'/g,"\\'"); }
