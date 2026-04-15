@@ -4,6 +4,11 @@
 // ============================================================
 
 require('dotenv').config();
+const { createClient } = require('@supabase/supabase-js');
+const sbServer = createClient(
+  process.env.SUPABASE_URL || 'https://jyzteirrmjangptekmgm.supabase.co',
+  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5enRlaXJybWphbmdwdGVrbWdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMjExNTYsImV4cCI6MjA5MTY5NzE1Nn0.Qc85njSX6BE15i3w8WN2SJ8t1vYzAzPDrP_9FRkQQCk'
+);
 const express = require('express');
 const { engine } = require('express-handlebars');
 const path = require('path');
@@ -150,18 +155,23 @@ app.get('/reservas', (req, res) => {
 });
 
 // POST Reservas — aquí puedes conectar con tu sistema de BD
-app.post('/reservas', (req, res) => {
-  const { llegada, salida, huespedes, habitacion, nombre1, dni1, nombre2, dni2 } = req.body;
-  // TODO: Guardar reserva en base de datos
-  // Por ahora redirige con mensaje de éxito
+app.post('/reservas', async (req, res) => {
+  const { fecha_reserva, hora_llegada, huespedes, habitacion, nombre1, dni1, nombre2, dni2, telefono, email_cliente } = req.body;
   console.log('Nueva reserva:', req.body);
-  res.render('reservas', {
-    title: 'Reservas',
-    page: 'reservas',
-    habitaciones,
-    exito: true,
-    datosReserva: req.body
-  });
+  try {
+    await sbServer.from('reservas_web').insert({
+      nombre_cliente: nombre1, dni_cliente: dni1,
+      nombre2: nombre2||null, dni2: dni2||null,
+      telefono: telefono||null, email: email_cliente||null,
+      habitacion_tipo: habitacion, fecha_reserva, hora_llegada,
+      num_huespedes: parseInt(huespedes)||1, estado:'pendiente',
+    });
+    await sbServer.from('notificaciones').insert({
+      tipo:'reserva_web', titulo:'Nueva Reserva Web',
+      mensaje: nombre1+' — '+habitacion+' — '+fecha_reserva+' '+hora_llegada, leida:false,
+    }).catch(()=>{});
+  } catch(e){ console.error('Reserva error:',e.message); }
+  res.render('reservas', { title:'Reservas', page:'reservas', habitaciones, exito:true, datosReserva:req.body });
 });
 
 app.get('/contacto', (req, res) => {
@@ -199,9 +209,13 @@ app.post('/contacto', async (req, res) => {
       `
     });
     enviado = true;
+    await sbServer.from('comentarios_web').insert({ nombre, email, asunto:asunto||null, mensaje, leido:false }).catch(()=>{});
+    await sbServer.from('notificaciones').insert({ tipo:'comentario_web', titulo:'Nuevo Mensaje Web', mensaje:nombre+': '+(asunto||mensaje.substring(0,60)), leida:false }).catch(()=>{});
   } catch (err) {
     console.error('Error enviando correo:', err.message);
     errorEnvio = true;
+    await sbServer.from('comentarios_web').insert({ nombre, email, asunto:asunto||null, mensaje, leido:false }).catch(()=>{});
+    await sbServer.from('notificaciones').insert({ tipo:'comentario_web', titulo:'Nuevo Mensaje Web', mensaje:nombre+': '+(asunto||mensaje.substring(0,60)), leida:false }).catch(()=>{});
   }
 
   res.render('contacto', {
@@ -218,7 +232,8 @@ app.get('/sistema', (req, res) => {
   res.render('sistema', {
     title: 'Sistema — Hoteles Rio',
     page: 'sistema',
-    layout: 'main'
+    layout: 'main',
+    isSistema: true
   });
 });
 

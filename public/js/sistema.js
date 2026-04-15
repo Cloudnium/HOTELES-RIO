@@ -45,12 +45,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
+// Peru = UTC-5 fijo (sin horario de verano)
+function fechaPeruHoy() {
+  const now = new Date();
+  const local = new Date(now.getTime() + (-5*60 - now.getTimezoneOffset()) * 60000);
+  return local.toISOString().substring(0, 10);
+}
+function ahoraPeruISO() {
+  const now = new Date();
+  return new Date(now.getTime() + (-5*60 - now.getTimezoneOffset()) * 60000).toISOString();
+}
 function setDateBadge() {
+  const hoy = fechaPeruHoy();
   const el = document.getElementById('sys-date-badge');
-  if (el) el.textContent = new Date().toLocaleDateString('es-PE',
+  if (el) el.textContent = new Date(hoy+'T12:00:00').toLocaleDateString('es-PE',
     { weekday:'long', year:'numeric', month:'long', day:'numeric' });
   const cf = document.getElementById('caja-fecha');
-  if (cf) cf.textContent = new Date().toLocaleDateString('es-PE');
+  if (cf) cf.textContent = new Date(hoy+'T12:00:00').toLocaleDateString('es-PE');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -116,11 +127,12 @@ async function handleLogin(user) {
   actualizarCajaStatus();
   showDashboard();
   loadSection('habitaciones');
+  initNotificaciones();
 }
 
 // Recuperar caja activa persistida
 async function recuperarCajaActiva() {
-  const hoy = new Date().toISOString().split('T')[0];
+  const hoy = fechaPeruHoy();
   const { data:cajas } = await sb.from('cajas')
     .select('*').eq('fecha', hoy).eq('estado', 'abierta')
     .eq('usuario_id', currentUserProfile.id);
@@ -183,10 +195,11 @@ function setupNavigation() {
 }
 
 const sectionTitles = {
-  habitaciones:'Habitaciones','tienda-hab':'Tienda por Habitación',
-  'tienda-publica':'Tienda Pública',almacen:'Almacén',
-  cajas:'Cajas del Día',reportes:'Reportes',
-  comprobantes:'Comprobantes',clientes:'Clientes',usuarios:'Usuarios'
+  habitaciones:'Habitaciones','reservas-web':'Reservas Web',
+  'tienda-hab':'Tienda por Habitación','tienda-publica':'Tienda Pública',
+  almacen:'Almacén',cajas:'Cajas del Día',reportes:'Reportes',
+  comprobantes:'Comprobantes',clientes:'Clientes',
+  comentarios:'Comentarios Web',usuarios:'Usuarios'
 };
 
 function loadSection(sec) {
@@ -195,10 +208,11 @@ function loadSection(sec) {
   if(el) el.classList.add('active');
   document.getElementById('sys-section-title').textContent=sectionTitles[sec]||sec;
   const loaders={
-    habitaciones:loadHabitaciones,'tienda-hab':loadTiendaHab,
-    'tienda-publica':loadTiendaPublica,almacen:loadAlmacen,
-    cajas:loadCajas,reportes:initReportes,
-    comprobantes:loadComprobantes,clientes:loadClientes,usuarios:loadUsuarios
+    habitaciones:loadHabitaciones,'reservas-web':loadReservasWeb,
+    'tienda-hab':loadTiendaHab,'tienda-publica':loadTiendaPublica,
+    almacen:loadAlmacen,cajas:loadCajas,reportes:initReportes,
+    comprobantes:loadComprobantes,clientes:loadClientes,
+    comentarios:loadComentarios,usuarios:loadUsuarios
   };
   loaders[sec]?.();
 }
@@ -336,14 +350,19 @@ async function openRoomModal(id) {
   }
 
   const estados=['disponible','ocupado','limpieza','mantenimiento','reservado'].filter(e=>e!==room.estado);
-  const ss=document.createElement('select'); ss.className='sys-select';
-  ss.innerHTML=`<option value="">Cambiar estado...</option>`+estados.map(e=>`<option value="${e}">${e}</option>`).join('');
-  ss.addEventListener('change',async()=>{
-    if(!ss.value) return;
-    await sb.from('habitaciones').update({estado:ss.value}).eq('id',id);
-    showToast('Estado actualizado','ok'); closeModal('modal-habitacion'); loadHabitaciones();
-  });
-  actions.appendChild(ss);
+  // Solo admin cambia estado sin check-in, edita y elimina
+  if(currentUserProfile?.rol==='admin'){
+    const ss=document.createElement('select'); ss.className='sys-select';
+    ss.innerHTML=`<option value="">Cambiar estado...</option>`+estados.map(e=>`<option value="${e}">${e}</option>`).join('');
+    ss.addEventListener('change',async()=>{
+      if(!ss.value) return;
+      await sb.from('habitaciones').update({estado:ss.value}).eq('id',id);
+      showToast('Estado actualizado','ok'); closeModal('modal-habitacion'); loadHabitaciones();
+    });
+    actions.appendChild(ss);
+    addBtn(actions,'✏️ Editar','sys-btn-outline',()=>{closeModal('modal-habitacion');editarHabitacion(id);});
+    addBtn(actions,'🗑 Eliminar','sys-btn-red sys-btn-sm',()=>{closeModal('modal-habitacion');eliminarHabitacion(id);});
+  }
   openModal('modal-habitacion');
 }
 
@@ -438,15 +457,45 @@ async function openCheckoutModal(room,checkin) {
     const vd=document.getElementById('vuelto-display');
     vd.textContent=`S/. ${v.toFixed(2)}`; vd.style.color=v>0?'var(--gold)':'var(--text-mid)';
   });
+  window._checkoutData={room,checkin,totalGeneral,consumos,totalHab,totalConsumos,noches,metodoPago:'Efectivo'};
   document.getElementById('btn-confirmar-checkout').onclick=async()=>{
+    const metP=window._checkoutData.metodoPago||'Efectivo';
     const recibido=parseFloat(document.getElementById('efectivo-recibido')?.value)||totalGeneral;
-    const vuelto=metodoPago==='Efectivo'?Math.max(0,recibido-totalGeneral):0;
-    await confirmarCheckout(room,checkin,totalGeneral,consumos,metodoPago,vuelto,noches,totalHab,totalConsumos);
+    const vuelto=metP==='Efectivo'?Math.max(0,recibido-totalGeneral):0;
+    window._checkoutData.vuelto=vuelto; window._checkoutData.metodoPago=metP;
+    // Check 4h limit
+    const ciTS=checkin.created_at||checkin.check_in_fecha+'T12:00:00';
+    const horasUsadas=(new Date()-new Date(ciTS))/3600000;
+    if(horasUsadas>4){
+      closeModal('modal-checkout');
+      const exceso=Math.max(0,horasUsadas-4).toFixed(1);
+      document.getElementById('penalizacion-info').innerHTML=
+        `⚠️ El huésped usó <strong>${horasUsadas.toFixed(1)} horas</strong> (límite 4h). Exceso: <strong>${exceso}h</strong>.`;
+      document.getElementById('penalizacion-monto').value='';
+      openModal('modal-penalizacion');
+    } else {
+      await confirmarCheckout(room,checkin,totalGeneral,consumos,metP,vuelto,noches,totalHab,totalConsumos,0);
+    }
   };
+  // Track metodo in realtime
+  document.getElementById('checkout-summary')?.querySelectorAll('.metodo-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{window._checkoutData.metodoPago=btn.dataset.metodo||'Efectivo';});
+  });
   openModal('modal-checkout');
 }
+async function continuarCheckoutSinPen(){
+  closeModal('modal-penalizacion');
+  const d=window._checkoutData;
+  await confirmarCheckout(d.room,d.checkin,d.totalGeneral,d.consumos,d.metodoPago,d.vuelto||0,d.noches,d.totalHab,d.totalConsumos,0);
+}
+async function continuarCheckoutConPen(){
+  const pen=parseFloat(document.getElementById('penalizacion-monto').value)||0;
+  closeModal('modal-penalizacion');
+  const d=window._checkoutData;
+  await confirmarCheckout(d.room,d.checkin,d.totalGeneral+pen,d.consumos,d.metodoPago,d.vuelto||0,d.noches,d.totalHab,d.totalConsumos,pen);
+}
 
-async function confirmarCheckout(room,checkin,total,consumos,metodoPago,vuelto,noches,totalHab,totalConsumos) {
+async function confirmarCheckout(room,checkin,total,consumos,metodoPago,vuelto,noches,totalHab,totalConsumos,penalizacion=0) {
   await sb.from('check_ins').update({check_out_real:new Date().toISOString(),total_cobrado:total,metodo_pago:metodoPago}).eq('id',checkin.id);
   await sb.from('habitaciones').update({estado:'limpieza'}).eq('id',room.id);
   if(consumos?.length) await sb.from('consumos_habitacion').update({cobrado:true}).in('id',consumos.map(c=>c.id));
@@ -791,7 +840,7 @@ function renderCarrito(){
 }
 
 async function loadVentasHoy() {
-  const hoy=new Date().toISOString().split('T')[0];
+  const hoy=fechaPeruHoy();
   const { data:ventas } = await sb.from('ventas_publicas').select('*, usuarios(nombre)').gte('created_at',hoy+'T00:00:00').order('created_at',{ascending:false});
   const tbody=document.getElementById('ventas-pub-list'); if(!tbody) return;
   tbody.innerHTML=ventas?.length?ventas.map(v=>`<tr><td>${formatTime(v.created_at)}</td><td>${v.detalle||'—'}</td><td>S/. ${v.total?.toFixed(2)}</td><td>${v.usuarios?.nombre||'—'}</td></tr>`).join(''):'<tr><td colspan="4" class="empty-row">Sin ventas hoy</td></tr>';
@@ -874,13 +923,16 @@ async function loadAlmacen(){
         <td>${p.codigo||'—'}</td><td><strong>${p.nombre}</strong></td><td>${p.categoria||'—'}</td>
         <td>S/. ${p.precio_venta?.toFixed(2)||'0.00'}</td><td><strong>${p.stock}</strong></td><td>${p.stock_minimo||5}</td>
         <td><span class="badge ${p.stock<=0?'badge-rojo':p.stock<=(p.stock_minimo||5)?'badge-amarillo':'badge-verde'}">${p.stock<=0?'Sin stock':p.stock<=(p.stock_minimo||5)?'Stock bajo':'OK'}</span></td>
-        <td>
+        <td>${currentUserProfile?.rol==='admin'?`
           <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="editProduct(${p.id})">Editar</button>
-          <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="toggleProduct(${p.id},${!p.activo})">${p.activo?'Desact.':'Activar'}</button>
+          <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="toggleProduct(${p.id},${!p.activo})">${p.activo?'Desact.':'Activar'}</button>`
+          :'<span style="font-size:11px;color:var(--text-3)">Solo admin</span>'}
         </td></tr>`).join('')
     :'<tr><td colspan="8" class="empty-row">No hay productos</td></tr>';
   const btnAdd=document.getElementById('btn-add-product');
-  if(btnAdd) btnAdd.onclick=()=>{
+  if(btnAdd){
+    if(currentUserProfile?.rol!=='admin') btnAdd.style.display='none';
+    else btnAdd.onclick=()=>{
     document.getElementById('prod-id').value='';
     document.getElementById('modal-prod-title').textContent='Nuevo producto';
     ['prod-nombre','prod-codigo','prod-precio-venta','prod-stock','prod-stock-min'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -890,6 +942,7 @@ async function loadAlmacen(){
     document.getElementById('stock-resultado-preview').textContent='';
     openModal('modal-producto');
   };
+  }
 }
 async function editProduct(id){
   const { data:p } = await sb.from('productos').select('*').eq('id',id).single();
@@ -1029,7 +1082,7 @@ async function imprimirCaja(cajaId){
 
 async function abrirCaja(){
   if(cajaActual){showToast('Ya tienes una caja abierta','err');return;}
-  const hoy=new Date().toISOString().split('T')[0];
+  const hoy=fechaPeruHoy();
   const { data } = await sb.from('cajas').insert({usuario_id:currentUserProfile?.id,fecha:hoy,estado:'abierta',total:0}).select().single();
   cajaActual=data; actualizarCajaStatus(); showToast('✅ Caja abierta','ok'); loadCajas();
 }
@@ -1043,16 +1096,15 @@ async function cerrarCaja(id){
 //  REPORTES
 // ══════════════════════════════════════════════════════════
 function initReportes(){
-  const hoy=new Date();
-  const primer=new Date(hoy.getFullYear(),hoy.getMonth(),1).toISOString().split('T')[0];
+  const hoyStr=fechaPeruHoy();
+  const hoyDate=new Date(hoyStr+'T12:00:00');
+  const primer=new Date(hoyDate.getFullYear(),hoyDate.getMonth(),1).toISOString().split('T')[0];
   const desdEl=document.getElementById('reporte-desde');
   const hastaEl=document.getElementById('reporte-hasta');
-  if(desdEl) desdEl.value=primer;
-  if(hastaEl) hastaEl.value=hoy.toISOString().split('T')[0];
-  // Auto-generar al cambiar fechas
+  if(desdEl){desdEl.removeAttribute('max');desdEl.removeAttribute('min');if(!desdEl.value)desdEl.value=primer;}
+  if(hastaEl){hastaEl.removeAttribute('max');hastaEl.removeAttribute('min');if(!hastaEl.value)hastaEl.value=hoyStr;}
   if(desdEl&&!desdEl._bound){desdEl._bound=true;desdEl.addEventListener('change',()=>{if(document.getElementById('reporte-hasta').value)generarReporte();});}
   if(hastaEl&&!hastaEl._bound){hastaEl._bound=true;hastaEl.addEventListener('change',()=>{if(document.getElementById('reporte-desde').value)generarReporte();});}
-  // Generar inmediatamente con el mes actual
   generarReporte();
 }
 async function generarReporte(){
@@ -1065,11 +1117,20 @@ async function generarReporte(){
   const { data:ventasPub } = await sb.from('ventas_publicas').select('*').gte('created_at',desdeTS).lte('created_at',hastaTS).order('created_at',{ascending:false});
   const totalHabTotal=checkins?.reduce((s,c)=>s+(c.total_cobrado||0),0)||0;
   const totalVentasPub=ventasPub?.reduce((s,v)=>s+(v.total||0),0)||0;
+  // Resumen por método de pago
+  const mMap={};
+  checkins?.forEach(c=>{const m=c.metodo_pago||'Efectivo';mMap[m]=(mMap[m]||0)+(c.total_cobrado||0);});
+  ventasPub?.forEach(v=>{const m=v.metodo_pago||'Efectivo';mMap[m]=(mMap[m]||0)+(v.total||0);});
+  const mColors={Efectivo:'#10b981',Tarjeta:'#3b82f6',Yape:'#7c3aed',Plin:'#ec4899'};
+  const mHTML=Object.entries(mMap).map(([m,v])=>
+    `<div class="stat-card-sys" style="border-left-color:${mColors[m]||'#6b7280'}"><p>${m}</p><h3>S/. ${v.toFixed(2)}</h3><small>por método</small></div>`
+  ).join('');
   document.getElementById('reporte-stats').innerHTML=`
     <div class="stat-card-sys"><p>Check-ins período</p><h3>${checkins?.length||0}</h3></div>
     <div class="stat-card-sys"><p>Ingresos Habitaciones</p><h3>S/. ${totalHabTotal.toFixed(2)}</h3><small>Incluye consumos</small></div>
     <div class="stat-card-sys"><p>Ingresos Tienda Pública</p><h3>S/. ${totalVentasPub.toFixed(2)}</h3></div>
-    <div class="stat-card-sys" style="border-left-color:#16a34a"><p>TOTAL GENERAL</p><h3>S/. ${(totalHabTotal+totalVentasPub).toFixed(2)}</h3></div>`;
+    <div class="stat-card-sys" style="border-left-color:#16a34a"><p>TOTAL GENERAL</p><h3>S/. ${(totalHabTotal+totalVentasPub).toFixed(2)}</h3></div>
+    ${mHTML}`;
   // Habitaciones
   const groupHab={};
   checkins?.forEach(c=>{const k=c.habitaciones?.numero||'?';if(!groupHab[k])groupHab[k]={numero:k,categoria:c.habitaciones?.categoria,noches:0,total:0};if(c.check_out_real)groupHab[k].noches+=Math.ceil((new Date(c.check_out_real)-new Date(c.check_in_fecha))/(1000*60*60*24));groupHab[k].total+=c.total_cobrado||0;});
@@ -1110,8 +1171,8 @@ async function loadComprobantes(){
   const hoy=new Date().toISOString().split('T')[0];
   const fd=document.getElementById('filter-comp-desde');
   const fh=document.getElementById('filter-comp-hasta');
-  if(fd&&!fd.value) fd.value=hoy;
-  if(fh&&!fh.value) fh.value=hoy;
+  if(fd){fd.removeAttribute('max');fd.removeAttribute('min');if(!fd.value)fd.value=hoy;}
+  if(fh){fh.removeAttribute('max');fh.removeAttribute('min');if(!fh.value)fh.value=hoy;}
   if(!document.getElementById('btn-filtrar-comp')._bound){
     document.getElementById('btn-filtrar-comp')._bound=true;
     document.getElementById('btn-filtrar-comp').addEventListener('click',filtrarComprobantes);
@@ -1242,3 +1303,239 @@ function showToast(msg,type='ok'){
 function formatDate(str){if(!str)return'—';return new Date(str).toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'});}
 function formatTime(str){if(!str)return'—';return new Date(str).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});}
 function escStr(str){return(str||'').replace(/'/g,"\\'");}
+
+// ══════════════════════════════════════════════════════════
+//  RESERVAS WEB
+// ══════════════════════════════════════════════════════════
+async function loadReservasWeb(){
+  const filterEstado=document.getElementById('filter-reserva-estado')?.value||'';
+  const filterFecha=document.getElementById('filter-reserva-fecha')?.value||'';
+  let q=sb.from('reservas_web').select('*').order('created_at',{ascending:false});
+  if(filterEstado) q=q.eq('estado',filterEstado);
+  if(filterFecha) q=q.eq('fecha_reserva',filterFecha);
+  const { data:res } = await q;
+  const pend=res?.filter(r=>r.estado==='pendiente').length||0;
+  const conf=res?.filter(r=>r.estado==='confirmada').length||0;
+  document.getElementById('reservas-stats').innerHTML=`
+    <div class="stat-card-sys"><p>Total reservas</p><h3>${res?.length||0}</h3></div>
+    <div class="stat-card-sys" style="border-left-color:var(--warning)"><p>Pendientes</p><h3>${pend}</h3></div>
+    <div class="stat-card-sys" style="border-left-color:var(--success)"><p>Confirmadas</p><h3>${conf}</h3></div>`;
+  document.getElementById('reservas-table').innerHTML=res?.length
+    ?res.map(r=>`<tr>
+        <td>${formatDate(r.fecha_reserva)}</td>
+        <td><strong>${r.hora_llegada||'—'}</strong></td>
+        <td><strong>${r.nombre_cliente||'—'}</strong></td>
+        <td>${r.dni_cliente||'—'}</td>
+        <td>${r.telefono||'—'}</td>
+        <td>${r.habitacion_tipo||'—'}</td>
+        <td>${r.num_huespedes||1}</td>
+        <td><span class="badge badge-${r.estado==='pendiente'?'amarillo':r.estado==='confirmada'?'verde':'rojo'}">${r.estado}</span></td>
+        <td style="font-size:11px">${formatDate(r.created_at)} ${formatTime(r.created_at)}</td>
+        <td style="white-space:nowrap">
+          <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="cambiarEstadoReserva(${r.id},'confirmada')">✅</button>
+          <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="cambiarEstadoReserva(${r.id},'cancelada')">❌</button>
+          <button class="sys-btn sys-btn-gold sys-btn-sm" onclick="hacerCheckinDesdeReserva(${r.id})">🛏 Check-in</button>
+        </td>
+      </tr>`).join('')
+    :'<tr><td colspan="10" class="empty-row">No hay reservas</td></tr>';
+  ['filter-reserva-estado','filter-reserva-fecha'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.removeAttribute('max');el.removeAttribute('min');if(!el._bound){el._bound=true;el.addEventListener('change',loadReservasWeb);}}
+  });
+}
+async function cambiarEstadoReserva(id,estado){
+  await sb.from('reservas_web').update({estado}).eq('id',id);
+  showToast(`Reserva ${estado}`,'ok'); loadReservasWeb();
+}
+async function hacerCheckinDesdeReserva(id){
+  const { data:r } = await sb.from('reservas_web').select('*').eq('id',id).single();
+  if(!r) return;
+  const cat=r.habitacion_tipo?.toLowerCase().split(' ')[0]||'';
+  const { data:habs } = await sb.from('habitaciones').select('*').eq('estado','disponible').ilike('categoria','%'+cat+'%').limit(1);
+  if(habs?.length){
+    openCheckinModal(habs[0]);
+    setTimeout(()=>{
+      document.getElementById('ci-nombre').value=r.nombre_cliente||'';
+      document.getElementById('ci-dni').value=r.dni_cliente||'';
+      document.getElementById('ci-tel').value=r.telefono||'';
+      document.getElementById('ci-email').value=r.email||'';
+      document.getElementById('ci-huespedes').value=r.num_huespedes||1;
+      document.getElementById('ci-entrada').value=r.fecha_reserva||fechaPeruHoy();
+    },100);
+    await sb.from('reservas_web').update({estado:'confirmada'}).eq('id',id);
+  } else {
+    showToast('No hay habitaciones disponibles de esa categoría','err');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  COMENTARIOS WEB
+// ══════════════════════════════════════════════════════════
+async function loadComentarios(){
+  const filtroLeido=document.getElementById('filter-com-leido')?.value||'';
+  let q=sb.from('comentarios_web').select('*').order('created_at',{ascending:false});
+  if(filtroLeido==='true') q=q.eq('leido',true);
+  else if(filtroLeido==='false') q=q.eq('leido',false);
+  const { data:coms } = await q;
+  const noLeidos=coms?.filter(c=>!c.leido).length||0;
+  const badge=document.getElementById('comentarios-count');
+  if(badge) badge.textContent=`${noLeidos} sin leer`;
+  document.getElementById('comentarios-table').innerHTML=coms?.length
+    ?coms.map(c=>`<tr>
+        <td style="font-size:11px">${formatDate(c.created_at)}</td>
+        <td><strong>${c.nombre||'—'}</strong></td>
+        <td>${c.email||'—'}</td>
+        <td>${c.asunto||'Sin asunto'}</td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${c.mensaje||'—'}</td>
+        <td><span class="badge ${c.leido?'badge-verde':'badge-amarillo'}">${c.leido?'Leído':'Nuevo'}</span></td>
+        <td style="white-space:nowrap">
+          <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="verComentario(${c.id})">Ver</button>
+          ${!c.leido?`<button class="sys-btn sys-btn-outline sys-btn-sm" onclick="marcarLeido(${c.id})">✓</button>`:''}
+        </td>
+      </tr>`).join('')
+    :'<tr><td colspan="7" class="empty-row">No hay mensajes</td></tr>';
+  const sel=document.getElementById('filter-com-leido');
+  if(sel&&!sel._bound){sel._bound=true;sel.addEventListener('change',loadComentarios);}
+}
+async function verComentario(id){
+  const { data:c } = await sb.from('comentarios_web').select('*').eq('id',id).single();
+  if(!c) return;
+  document.getElementById('modal-com-title').textContent=c.asunto||'Mensaje';
+  document.getElementById('modal-com-body').innerHTML=`
+    <div style="margin-bottom:14px">
+      <div class="modal-info-row"><span>De</span><span><strong>${c.nombre}</strong></span></div>
+      <div class="modal-info-row"><span>Email</span><span>${c.email||'—'}</span></div>
+      <div class="modal-info-row"><span>Fecha</span><span>${formatDate(c.created_at)} ${formatTime(c.created_at)}</span></div>
+    </div>
+    <div style="background:var(--bg);padding:14px;border-radius:var(--radius-sm);line-height:1.6;font-size:13px">${c.mensaje||'—'}</div>
+    <div class="form-actions">
+      <button class="sys-btn sys-btn-outline" data-modal="modal-comentario">Cerrar</button>
+      ${!c.leido?`<button class="sys-btn sys-btn-gold" onclick="marcarLeido(${c.id});closeModal('modal-comentario')">Marcar leído</button>`:''}
+    </div>`;
+  openModal('modal-comentario');
+  if(!c.leido) await sb.from('comentarios_web').update({leido:true}).eq('id',id).then(()=>loadComentarios());
+}
+async function marcarLeido(id){
+  await sb.from('comentarios_web').update({leido:true}).eq('id',id);
+  showToast('Marcado como leído','ok'); loadComentarios();
+}
+
+// ══════════════════════════════════════════════════════════
+//  NOTIFICACIONES REALTIME
+// ══════════════════════════════════════════════════════════
+let _notifChannel=null;
+async function initNotificaciones(){
+  await cargarNotificaciones();
+  if(_notifChannel) sb.removeChannel(_notifChannel);
+  _notifChannel=sb.channel('notif-ch')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'notificaciones'},
+      payload=>{mostrarNotifToast(payload.new);cargarNotificaciones();})
+    .subscribe();
+}
+async function cargarNotificaciones(){
+  const { data:notifs } = await sb.from('notificaciones').select('*').eq('leida',false).order('created_at',{ascending:false}).limit(20);
+  const count=notifs?.length||0;
+  const badge=document.getElementById('notif-badge');
+  if(badge){badge.textContent=count;badge.style.display=count>0?'flex':'none';}
+  const list=document.getElementById('notif-list');
+  if(!list) return;
+  list.innerHTML=notifs?.length
+    ?notifs.map(n=>`<div class="notif-item unread" onclick="abrirNotif(${n.id},'${n.tipo}')">
+        <div class="notif-item-title">${n.tipo==='reserva_web'?'🏨':'💬'} ${n.titulo||'Notificación'}</div>
+        <div class="notif-item-msg">${n.mensaje||''}</div>
+        <div class="notif-item-time">${formatTime(n.created_at)}</div>
+      </div>`).join('')
+    :'<div class="notif-empty">Sin notificaciones nuevas</div>';
+}
+function mostrarNotifToast(n){showToast(`🔔 ${n.titulo}: ${n.mensaje}`,'ok');}
+async function abrirNotif(id,tipo){
+  await sb.from('notificaciones').update({leida:true}).eq('id',id);
+  closeNotifPanel();
+  if(tipo==='reserva_web') loadSection('reservas-web');
+  else loadSection('comentarios');
+  cargarNotificaciones();
+}
+function toggleNotifPanel(){
+  const p=document.getElementById('notif-panel');
+  if(p) p.style.display=p.style.display==='none'||!p.style.display?'block':'none';
+}
+function closeNotifPanel(){const p=document.getElementById('notif-panel');if(p)p.style.display='none';}
+async function marcarTodasLeidas(){
+  await sb.from('notificaciones').update({leida:true}).eq('leida',false);
+  cargarNotificaciones(); closeNotifPanel();
+}
+document.addEventListener('click',e=>{
+  const panel=document.getElementById('notif-panel');
+  const btn=document.getElementById('notif-btn');
+  if(panel&&btn&&!panel.contains(e.target)&&!btn.contains(e.target)) panel.style.display='none';
+});
+
+// ══════════════════════════════════════════════════════════
+//  EDITAR MÉTODO DE PAGO COMPROBANTE (solo admin)
+// ══════════════════════════════════════════════════════════
+async function editarMetodoPago(id){
+  if(currentUserProfile?.rol!=='admin'){showToast('Solo el administrador puede editar comprobantes','err');return;}
+  const { data:comp } = await sb.from('comprobantes').select('serie,metodo_pago').eq('id',id).single();
+  if(!comp) return;
+  document.getElementById('edit-comp-id').value=id;
+  document.getElementById('edit-comp-serie').value=comp.serie||'';
+  const modal=document.getElementById('modal-editar-metodo');
+  modal.querySelectorAll('.metodo-btn').forEach(btn=>{
+    btn.classList.toggle('active',btn.dataset.metodo===comp.metodo_pago);
+    btn.onclick=()=>{modal.querySelectorAll('.metodo-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');};
+  });
+  openModal('modal-editar-metodo');
+}
+document.getElementById('btn-guardar-metodo')?.addEventListener('click',async()=>{
+  const id=document.getElementById('edit-comp-id').value;
+  const modal=document.getElementById('modal-editar-metodo');
+  const metodo=modal.querySelector('.metodo-btn.active')?.dataset.metodo;
+  if(!metodo||!id) return;
+  await sb.from('comprobantes').update({metodo_pago:metodo}).eq('id',id);
+  showToast('Método actualizado ✓','ok'); closeModal('modal-editar-metodo'); loadComprobantes();
+});
+
+// ══════════════════════════════════════════════════════════
+//  HABITACIONES: AGREGAR / EDITAR / ELIMINAR (solo admin)
+// ══════════════════════════════════════════════════════════
+function abrirModalNuevaHab(){
+  if(currentUserProfile?.rol!=='admin'){showToast('Solo admin','err');return;}
+  document.getElementById('hab-edit-id').value='';
+  document.getElementById('modal-hab-edit-title').textContent='Nueva Habitación';
+  ['hab-edit-numero','hab-edit-precio','hab-edit-desc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('hab-edit-piso').value='1';
+  document.getElementById('hab-edit-categoria').value='economico';
+  openModal('modal-habitacion-edit');
+}
+async function editarHabitacion(id){
+  if(currentUserProfile?.rol!=='admin'){showToast('Solo admin','err');return;}
+  const { data:h } = await sb.from('habitaciones').select('*').eq('id',id).single();
+  document.getElementById('hab-edit-id').value=id;
+  document.getElementById('modal-hab-edit-title').textContent='Editar Habitación';
+  document.getElementById('hab-edit-numero').value=h.numero||'';
+  document.getElementById('hab-edit-piso').value=h.piso||1;
+  document.getElementById('hab-edit-categoria').value=h.categoria||'economico';
+  document.getElementById('hab-edit-precio').value=h.precio_noche||'';
+  document.getElementById('hab-edit-desc').value=h.descripcion||'';
+  openModal('modal-habitacion-edit');
+}
+document.getElementById('btn-guardar-habitacion')?.addEventListener('click',async()=>{
+  const id=document.getElementById('hab-edit-id').value;
+  const data={
+    numero:parseInt(document.getElementById('hab-edit-numero').value)||0,
+    piso:parseInt(document.getElementById('hab-edit-piso').value)||1,
+    categoria:document.getElementById('hab-edit-categoria').value,
+    precio_noche:parseFloat(document.getElementById('hab-edit-precio').value)||0,
+    descripcion:document.getElementById('hab-edit-desc').value,
+  };
+  if(!data.numero){showToast('El número es obligatorio','err');return;}
+  if(id) await sb.from('habitaciones').update(data).eq('id',id);
+  else {data.estado='disponible'; await sb.from('habitaciones').insert(data);}
+  showToast('Habitación guardada ✓','ok'); closeModal('modal-habitacion-edit'); loadHabitaciones();
+});
+async function eliminarHabitacion(id){
+  if(currentUserProfile?.rol!=='admin'){showToast('Solo admin','err');return;}
+  if(!confirm('¿Eliminar esta habitación? Acción irreversible.')) return;
+  await sb.from('habitaciones').delete().eq('id',id);
+  showToast('Habitación eliminada','ok'); loadHabitaciones();
+}

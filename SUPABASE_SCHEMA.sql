@@ -291,3 +291,58 @@ ALTER TABLE comprobantes ADD CONSTRAINT comprobantes_tipo_serie_check
 -- UPDATE habitaciones SET categoria = 'premium' WHERE categoria = 'matrimonial';
 -- (La categoría suite se mantiene igual)
 
+
+-- ══════════════════════════════════════════════════════════
+--  TABLAS NUEVAS v6 — Ejecutar en Supabase SQL Editor
+-- ══════════════════════════════════════════════════════════
+
+-- Reservas desde la web pública
+CREATE TABLE IF NOT EXISTS reservas_web (
+  id               BIGSERIAL PRIMARY KEY,
+  nombre_cliente   TEXT NOT NULL,
+  dni_cliente      TEXT,
+  nombre2          TEXT,
+  dni2             TEXT,
+  telefono         TEXT,
+  email            TEXT,
+  habitacion_tipo  TEXT NOT NULL,
+  fecha_reserva    DATE NOT NULL,
+  hora_llegada     TIME,
+  num_huespedes    INTEGER DEFAULT 1,
+  estado           TEXT DEFAULT 'pendiente' CHECK (estado IN ('pendiente','confirmada','cancelada')),
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE reservas_web ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public_insert_reservas" ON reservas_web FOR INSERT TO anon WITH CHECK (true);
+CREATE POLICY "auth_all_reservas" ON reservas_web FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Mensajes de contacto desde la web
+CREATE TABLE IF NOT EXISTS comentarios_web (
+  id         BIGSERIAL PRIMARY KEY,
+  nombre     TEXT NOT NULL,
+  email      TEXT,
+  asunto     TEXT,
+  mensaje    TEXT NOT NULL,
+  leido      BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE comentarios_web ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public_insert_comentarios" ON comentarios_web FOR INSERT TO anon WITH CHECK (true);
+CREATE POLICY "auth_all_comentarios" ON comentarios_web FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Notificaciones realtime
+CREATE TABLE IF NOT EXISTS notificaciones (
+  id         BIGSERIAL PRIMARY KEY,
+  tipo       TEXT NOT NULL,
+  titulo     TEXT,
+  mensaje    TEXT,
+  leida      BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE notificaciones ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public_insert_notif" ON notificaciones FOR INSERT TO anon WITH CHECK (true);
+CREATE POLICY "auth_all_notif" ON notificaciones FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- IMPORTANTE: En Supabase Dashboard → Table Editor → tabla "notificaciones" → activar "Realtime"
+-- También: Database → Replication → habilitar tabla notificaciones
+

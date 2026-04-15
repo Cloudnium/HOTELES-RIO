@@ -57,6 +57,9 @@
         <a class="sys-nav-item active" data-sec="habitaciones">
           <i class="fas fa-bed fa-fw"></i> Habitaciones
         </a>
+        <a class="sys-nav-item" data-sec="reservas-web">
+          <i class="fas fa-calendar-check fa-fw"></i> Reservas Web
+        </a>
         <a class="sys-nav-item" data-sec="tienda-hab">
           <i class="fas fa-concierge-bell fa-fw"></i> Tienda x Habitación
         </a>
@@ -83,6 +86,9 @@
         <div class="sys-nav-group">Administración</div>
         <a class="sys-nav-item" data-sec="clientes">
           <i class="fas fa-users fa-fw"></i> Clientes
+        </a>
+        <a class="sys-nav-item" data-sec="comentarios">
+          <i class="fas fa-comments fa-fw"></i> Comentarios
         </a>
         <a class="sys-nav-item" data-sec="usuarios">
           <i class="fas fa-user-cog fa-fw"></i> Usuarios
@@ -111,11 +117,26 @@
           <h1 id="sys-section-title">Habitaciones</h1>
         </div>
         <div class="sys-topbar-right">
+          <button class="notif-btn" id="notif-btn" onclick="toggleNotifPanel()" title="Notificaciones">
+            <i class="fas fa-bell"></i>
+            <span class="notif-badge" id="notif-badge" style="display:none">0</span>
+          </button>
           <div id="caja-status-topbar" class="caja-status-topbar cerrada">
             <span class="dot"></span>
             <span id="caja-status-text">Sin caja</span>
           </div>
           <span id="sys-date-badge" class="sys-date-badge"></span>
+          <a href="/" class="btn-inicio-web" title="Ir al inicio del Hotel">
+            <i class="fas fa-hotel"></i>
+          </a>
+        </div>
+        <!-- Panel notificaciones -->
+        <div id="notif-panel" class="notif-panel" style="display:none">
+          <div class="notif-panel-head">
+            <h4>Notificaciones</h4>
+            <button onclick="marcarTodasLeidas()" class="sys-btn sys-btn-outline sys-btn-sm">Marcar leídas</button>
+          </div>
+          <div id="notif-list" class="notif-list"><div class="notif-empty">Sin notificaciones</div></div>
         </div>
       </header>
 
@@ -135,7 +156,10 @@
                 <option value="reservado">Reservado</option>
               </select>
             </div>
-            <div class="sec-toolbar-right">
+            <div class="sec-toolbar-right" style="display:flex;align-items:center;gap:10px">
+              <button class="sys-btn sys-btn-gold sys-btn-sm" id="btn-nueva-hab-admin" onclick="abrirModalNuevaHab()" style="display:none">
+                <i class="fas fa-plus"></i> Nueva hab.
+              </button>
               <div class="legend-dots">
                 <span class="dot dot-verde"></span>Disponible
                 <span class="dot dot-rojo"></span>Ocupado
@@ -146,6 +170,28 @@
             </div>
           </div>
           <div id="rooms-grid" class="rooms-grid-sys"></div>
+        </section>
+
+        <!-- ═══ RESERVAS WEB ═══ -->
+        <section id="sec-reservas-web" class="sys-section">
+          <div class="sec-toolbar">
+            <div class="sec-toolbar-left">
+              <select id="filter-reserva-estado" class="sys-select">
+                <option value="">Todos los estados</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="confirmada">Confirmada</option>
+                <option value="cancelada">Cancelada</option>
+              </select>
+              <input type="date" class="sys-input" id="filter-reserva-fecha">
+            </div>
+          </div>
+          <div class="stats-row-sys" id="reservas-stats"></div>
+          <div class="sys-card">
+            <div class="table-wrap"><table>
+              <thead><tr><th>Fecha</th><th>Hora Llegada</th><th>Cliente</th><th>DNI</th><th>Teléfono</th><th>Habitación</th><th>Huésp.</th><th>Estado</th><th>Recibida</th><th>Acciones</th></tr></thead>
+              <tbody id="reservas-table"><tr><td colspan="10" class="empty-row">Cargando reservas...</td></tr></tbody>
+            </table></div>
+          </div>
         </section>
 
         <!-- ═══ TIENDA x HABITACIÓN ═══ -->
@@ -353,6 +399,26 @@
             <div class="table-wrap"><table>
               <thead><tr><th>Nombre</th><th>DNI/Pasaporte</th><th>Teléfono</th><th>Email</th><th>Última estancia</th><th>Visitas</th><th></th></tr></thead>
               <tbody id="clientes-table"><tr><td colspan="7" class="empty-row">Cargando clientes...</td></tr></tbody>
+            </table></div>
+          </div>
+        </section>
+
+        <!-- ═══ COMENTARIOS WEB ═══ -->
+        <section id="sec-comentarios" class="sys-section">
+          <div class="sec-toolbar">
+            <div class="sec-toolbar-left">
+              <select id="filter-com-leido" class="sys-select">
+                <option value="">Todos</option>
+                <option value="false">No leídos</option>
+                <option value="true">Leídos</option>
+              </select>
+            </div>
+            <span id="comentarios-count" class="total-badge"></span>
+          </div>
+          <div class="sys-card">
+            <div class="table-wrap"><table>
+              <thead><tr><th>Fecha</th><th>Nombre</th><th>Email</th><th>Asunto</th><th>Mensaje</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <tbody id="comentarios-table"><tr><td colspan="7" class="empty-row">Cargando comentarios...</td></tr></tbody>
             </table></div>
           </div>
         </section>
@@ -571,6 +637,99 @@
       <div class="form-actions">
         <button class="sys-btn sys-btn-outline" data-modal="modal-pago-pub">Cancelar</button>
         <button class="sys-btn sys-btn-gold" id="btn-confirmar-pago-pub"><i class="fas fa-print"></i> Imprimir y confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal penalización -->
+<div id="modal-penalizacion" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head">
+      <h3>⚠️ Tiempo Excedido</h3>
+      <button class="modal-close" data-modal="modal-penalizacion">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <div id="penalizacion-info" style="background:var(--danger-light);padding:14px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:13px;color:var(--danger)"></div>
+      <div class="form-field">
+        <label>Monto de penalización (S/.) — Opcional</label>
+        <input type="number" id="penalizacion-monto" class="sys-input" placeholder="0.00" step="0.01" min="0">
+        <small style="color:var(--text-3);font-size:11px;margin-top:4px;display:block">Deja en 0 si no aplicas penalización</small>
+      </div>
+      <div class="form-actions">
+        <button class="sys-btn sys-btn-outline" onclick="continuarCheckoutSinPen()">Sin penalización</button>
+        <button class="sys-btn sys-btn-red" onclick="continuarCheckoutConPen()">Aplicar y continuar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal editar método de pago (admin) -->
+<div id="modal-editar-metodo" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head">
+      <h3><i class="fas fa-edit" style="color:var(--primary);margin-right:8px"></i>Editar Método de Pago</h3>
+      <button class="modal-close" data-modal="modal-editar-metodo">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <div class="form-field" style="margin-bottom:14px">
+        <label>Serie del comprobante</label>
+        <input type="text" id="edit-comp-serie" class="sys-input" readonly style="background:var(--bg)">
+        <input type="hidden" id="edit-comp-id">
+      </div>
+      <div class="form-field">
+        <label>Nuevo método de pago</label>
+        <div class="metodo-pago-grid">
+          <button class="metodo-btn active" data-metodo="Efectivo">💵 Efectivo</button>
+          <button class="metodo-btn" data-metodo="Tarjeta">💳 Tarjeta</button>
+          <button class="metodo-btn" data-metodo="Yape">📱 Yape</button>
+          <button class="metodo-btn" data-metodo="Plin">📱 Plin</button>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="sys-btn sys-btn-outline" data-modal="modal-editar-metodo">Cancelar</button>
+        <button class="sys-btn sys-btn-gold" id="btn-guardar-metodo">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal ver comentario -->
+<div id="modal-comentario" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head">
+      <h3 id="modal-com-title">Mensaje</h3>
+      <button class="modal-close" data-modal="modal-comentario">✕</button>
+    </div>
+    <div class="sys-modal-body" id="modal-com-body"></div>
+  </div>
+</div>
+
+<!-- Modal habitación agregar/editar (admin) -->
+<div id="modal-habitacion-edit" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head">
+      <h3 id="modal-hab-edit-title">Nueva Habitación</h3>
+      <button class="modal-close" data-modal="modal-habitacion-edit">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <div class="form-grid-2">
+        <div class="form-field"><label>Número</label><input type="number" id="hab-edit-numero" class="sys-input" placeholder="101"></div>
+        <div class="form-field"><label>Piso</label><input type="number" id="hab-edit-piso" class="sys-input" value="1" min="1"></div>
+        <div class="form-field"><label>Categoría</label>
+          <select id="hab-edit-categoria" class="sys-select">
+            <option value="economico">Económico</option>
+            <option value="premium">Premium</option>
+            <option value="suite">Suite</option>
+          </select>
+        </div>
+        <div class="form-field"><label>Precio por hora (S/.)</label><input type="number" id="hab-edit-precio" class="sys-input" placeholder="0.00" step="0.01"></div>
+        <div class="form-field form-field-full"><label>Descripción (opcional)</label><textarea id="hab-edit-desc" class="sys-input" rows="2"></textarea></div>
+        <input type="hidden" id="hab-edit-id">
+      </div>
+      <div class="form-actions">
+        <button class="sys-btn sys-btn-outline" data-modal="modal-habitacion-edit">Cancelar</button>
+        <button class="sys-btn sys-btn-gold" id="btn-guardar-habitacion">Guardar habitación</button>
       </div>
     </div>
   </div>

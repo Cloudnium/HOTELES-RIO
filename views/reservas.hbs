@@ -25,8 +25,8 @@
         <strong>¡Reserva recibida con éxito!</strong>
         <p>Nos contactaremos con usted a la brevedad para confirmar su reserva.<br>
         Habitación: <strong>{{datosReserva.habitacion}}</strong> —
-        Llegada: <strong>{{datosReserva.llegada}}</strong> —
-        Salida: <strong>{{datosReserva.salida}}</strong></p>
+        Fecha: <strong>{{datosReserva.fecha_reserva}}</strong> —
+        Hora llegada: <strong>{{datosReserva.hora_llegada}}</strong></p>
       </div>
     </div>
     {{/if}}
@@ -45,12 +45,12 @@
             </div>
             <div class="form-grid-2">
               <div class="form-group">
-                <label for="llegada">Fecha de llegada *</label>
-                <input type="date" id="llegada" name="llegada" class="input-dark" required>
+                <label for="fecha_reserva">Fecha de reserva *</label>
+                <input type="date" id="fecha_reserva" name="fecha_reserva" class="input-dark" required>
               </div>
               <div class="form-group">
-                <label for="salida">Fecha de salida *</label>
-                <input type="date" id="salida" name="salida" class="input-dark" required>
+                <label for="hora_llegada">Hora estimada de llegada *</label>
+                <input type="time" id="hora_llegada" name="hora_llegada" class="input-dark" required>
               </div>
             </div>
             <div class="form-group">
@@ -107,6 +107,16 @@
               </div>
             </div>
             <!-- Persona 2 (se muestra si eligen 2 huéspedes) -->
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="telefono">Teléfono de contacto *</label>
+                <input type="tel" id="telefono" name="telefono" class="input-dark" placeholder="+51 999 999 999">
+              </div>
+              <div class="form-group">
+                <label for="email_cliente">Email (opcional)</label>
+                <input type="email" id="email_cliente" name="email_cliente" class="input-dark" placeholder="correo@ejemplo.com">
+              </div>
+            </div>
             <div class="form-grid-2" id="persona2Row">
               <div class="form-group">
                 <label for="nombre2">Nombre — Persona 2</label>
@@ -162,5 +172,30 @@
     </div>
   </div>
 </section>
+
+
+{{#if exito}}
+<script>
+window.addEventListener('load',function(){
+  setTimeout(function(){
+    var datos={nombre:'{{datosReserva.nombre1}}',dni:'{{datosReserva.dni1}}',
+      telefono:'{{datosReserva.telefono}}',habitacion:'{{datosReserva.habitacion}}',
+      fecha:'{{datosReserva.fecha_reserva}}',hora:'{{datosReserva.hora_llegada}}',
+      huespedes:'{{datosReserva.huespedes}}'};
+    var win=window.open('','_blank','width=420,height=580');
+    var fecha=datos.fecha?new Date(datos.fecha+'T12:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'long',year:'numeric'}):datos.fecha;
+    win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Reserva</title><style>@page{size:80mm auto;margin:4mm}*{margin:0;padding:0;box-sizing:border-box}body{font-family:"Courier New",Courier,monospace;font-size:11px;width:72mm;color:#000;background:#fff}.c{text-align:center}.b{font-weight:bold}.big{font-size:14px}.sm{font-size:9px}.ln{border-top:1px dashed #000;margin:4px 0}.logo{width:55mm;max-height:22mm;object-fit:contain;display:block;margin:0 auto 4px}table{width:100%;border-collapse:collapse}td{padding:2px 0;vertical-align:top}td.r{text-align:right}@media print{button{display:none!important}}</style></head><body>');
+    win.document.write('<div class="c"><img src="/images/logos/logo.png" class="logo" onerror="this.style.display='none'"><div class="b big">HOTELES RIO</div><div class="sm">Au. Panamericana N 915, Sullana</div><div class="sm">Tel: +51 951-149-420</div></div>');
+    win.document.write('<div class="ln"></div><div class="c b">CONFIRMACIÓN DE RESERVA</div><div class="ln"></div>');
+    win.document.write('<table><tr><td class="b">Nombre:</td><td class="r">'+datos.nombre+'</td></tr><tr><td class="b">DNI:</td><td class="r">'+datos.dni+'</td></tr><tr><td class="b">Teléfono:</td><td class="r">'+(datos.telefono||'—')+'</td></tr><tr><td class="b">Huéspedes:</td><td class="r">'+datos.huespedes+'</td></tr></table>');
+    win.document.write('<div class="ln"></div>');
+    win.document.write('<table><tr><td class="b">Habitación:</td><td class="r">'+datos.habitacion+'</td></tr><tr><td class="b">Fecha reserva:</td><td class="r">'+fecha+'</td></tr><tr><td class="b">Hora de llegada:</td><td class="r">'+datos.hora+'</td></tr></table>');
+    win.document.write('<div class="ln"></div><div class="c sm">Reserva tentativa. Le confirmaremos.</div><div class="c sm">Límite: 4 horas por habitación.</div><div class="ln"></div><div class="c sm">¡Gracias por elegir Hoteles Rio!</div><br><br>');
+    win.document.write('<div style="text-align:center;margin-top:10px"><button onclick="window.print()" style="padding:8px 22px;font-size:13px;cursor:pointer;background:#1a1a1a;color:#fff;border:none;border-radius:4px;font-family:sans-serif">🖨 Imprimir</button></div>');
+    win.document.write('</body></html>');win.document.close();
+  },800);
+});
+</script>
+{{/if}}
 
 <script src="/js/reservas.js"></script>

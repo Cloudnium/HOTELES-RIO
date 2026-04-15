@@ -21,22 +21,22 @@
 
   <link rel="stylesheet" href="/css/variables.css">
   <link rel="stylesheet" href="/css/base.css">
-  <link rel="stylesheet" href="/css/nav.css">
-  <link rel="stylesheet" href="/css/footer.css">
+  {{#unless isSistema}}<link rel="stylesheet" href="/css/nav.css">{{/unless}}
+  {{#unless isSistema}}<link rel="stylesheet" href="/css/footer.css">{{/unless}}
   <link rel="stylesheet" href="/css/animations.css">
 </head>
-<body class="page-{{page}}">
+<body class="page-{{page}}{{#if isSistema}} page-sistema-full{{/if}}">
 
-  {{> nav}}
+  {{#unless isSistema}}{{> nav}}{{/unless}}
 
   <main>
     {{{body}}}
   </main>
 
-  {{> footer}}
+  {{#unless isSistema}}{{> footer}}{{/unless}}
 
   <script src="/js/main.js"></script>
   
-  {{> whatsapp-btn}} 
+  {{#unless isSistema}}{{> whatsapp-btn}}{{/unless}} 
 </body>
 </html>
