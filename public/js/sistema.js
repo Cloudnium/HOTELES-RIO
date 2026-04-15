@@ -289,7 +289,7 @@ function renderRoomsGrid(rooms) {
               <div class="room-card-top">
                 <div>
                   <div class="room-card-num">NRO: ${String(r.numero).padStart(3,'0')}</div>
-                  <div class="room-card-cat">S/. ${r.precio_noche||0}/noche</div>
+                  <div class="room-card-cat">S/. ${r.precio_noche||0} x 4 horas</div>
                 </div>
                 <div class="room-card-icon">${roomIcon(r.estado)}</div>
               </div>
@@ -328,7 +328,7 @@ async function openRoomModal(id) {
     <h2>Habitación ${String(room.numero).padStart(3,'0')}</h2>
     <div class="modal-info-row"><span>Estado</span><span><span class="badge badge-${badgeColor(room.estado)}">${room.estado}</span></span></div>
     <div class="modal-info-row"><span>Categoría</span><span>${CATEGORIA_LABELS[room.categoria]||room.categoria}</span></div>
-    <div class="modal-info-row"><span>Precio/noche</span><span>S/. ${room.precio_noche||'—'}</span></div>
+    <div class="modal-info-row"><span>Precio/4 horas</span><span>S/. ${room.precio_noche||'—'}</span></div>
     ${checkinActivo?`
       <div class="modal-info-row"><span>Huésped</span><span>${checkinActivo.clientes?.nombre||checkinActivo.nombre_huesped}</span></div>
       <div class="modal-info-row"><span>Check-in</span><span>${formatDate(checkinActivo.check_in_fecha)}</span></div>
@@ -575,7 +575,7 @@ function imprimirTicketHabitacion(d) {
     <div class="ln"></div>
     <table>
       <tr><td>Hab. — ${d.noches} noche(s)</td><td class="r">S/.${d.totalHab.toFixed(2)}</td></tr>
-      <tr><td class="sm">&nbsp;Precio/noche: S/.${(d.checkin.precio_noche||0).toFixed(2)}</td><td></td></tr>
+      <tr><td class="sm">&nbsp;Precio/4 horas: S/.${(d.checkin.precio_noche||0).toFixed(2)}</td><td></td></tr>
     </table>
     ${consumosHTML}
     <div class="ln"></div>
