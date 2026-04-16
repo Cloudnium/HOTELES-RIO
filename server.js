@@ -157,21 +157,52 @@ app.get('/reservas', (req, res) => {
 // POST Reservas — aquí puedes conectar con tu sistema de BD
 app.post('/reservas', async (req, res) => {
   const { fecha_reserva, hora_llegada, huespedes, habitacion, nombre1, dni1, nombre2, dni2, telefono, email_cliente } = req.body;
+
   console.log('Nueva reserva:', req.body);
+
   try {
-    await sbServer.from('reservas_web').insert({
-      nombre_cliente: nombre1, dni_cliente: dni1,
-      nombre2: nombre2||null, dni2: dni2||null,
-      telefono: telefono||null, email: email_cliente||null,
-      habitacion_tipo: habitacion, fecha_reserva, hora_llegada,
-      num_huespedes: parseInt(huespedes)||1, estado:'pendiente',
-    });
-    await sbServer.from('notificaciones').insert({
-      tipo:'reserva_web', titulo:'Nueva Reserva Web',
-      mensaje: nombre1+' — '+habitacion+' — '+fecha_reserva+' '+hora_llegada, leida:false,
-    }).catch(()=>{});
-  } catch(e){ console.error('Reserva error:',e.message); }
-  res.render('reservas', { title:'Reservas', page:'reservas', habitaciones, exito:true, datosReserva:req.body });
+    const { data, error } = await sbServer
+      .from('reservas_web')
+      .insert([{
+        nombre_cliente: nombre1,
+        dni_cliente: dni1,
+        nombre2: nombre2 || null,
+        dni2: dni2 || null,
+        telefono: telefono || null,
+        email: email_cliente || null,
+        habitacion_tipo: habitacion,
+        fecha_reserva,
+        hora_llegada,
+        num_huespedes: parseInt(huespedes) || 1,
+        estado: 'pendiente'
+      }]);
+
+    if (error) {
+      console.error('❌ ERROR SUPABASE:', error);
+      return res.send('Error al guardar reserva');
+    }
+
+    console.log('✅ Guardado en Supabase:', data);
+
+    await sbServer.from('notificaciones').insert([{
+      tipo: 'reserva_web',
+      titulo: 'Nueva Reserva Web',
+      mensaje: nombre1 + ' — ' + habitacion + ' — ' + fecha_reserva + ' ' + hora_llegada,
+      leida: false,
+    }]).catch(()=>{});
+
+  } catch (e) {
+    console.error('💥 ERROR GENERAL:', e);
+    return res.send('Error servidor');
+  }
+
+  res.render('reservas', {
+    title: 'Reservas',
+    page: 'reservas',
+    habitaciones,
+    exito: true,
+    datosReserva: req.body
+  });
 });
 
 app.get('/contacto', (req, res) => {
