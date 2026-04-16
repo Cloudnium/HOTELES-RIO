@@ -6,7 +6,7 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const sbServer = createClient(
-  process.env.SUPABASE_URL || 'https://jyzteirrmjangptekmgm.supabase.co',
+  process.env.SUPABASE_URL || 'https://fqxhrpimdskvfnupjhxs.supabase.co',
   process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxeGhycGltZHNrdmZudXBqaHhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyOTQ0MTksImV4cCI6MjA5MTg3MDQxOX0.08VbFHp6m5s3E5LniyMwEm61eamIM03hdIHx-gQ4jJs'
 );
 const express = require('express');
