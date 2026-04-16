@@ -240,18 +240,58 @@ async function registrarComprobante({ serie, tipo, descripcion, cliente, total, 
 // ══════════════════════════════════════════════════════════
 //  HABITACIONES — agrupadas por categoría
 // ══════════════════════════════════════════════════════════
+let _timerInterval = null;
+
+function actualizarTimers() {
+  document.querySelectorAll('[data-checkin-inicio]').forEach(el => {
+    const inicio = new Date(el.dataset.checkinInicio);
+    if(isNaN(inicio)) return;
+    const diffMs = Date.now() - inicio.getTime();
+    const totalSeg = Math.floor(diffMs / 1000);
+    const h = Math.floor(totalSeg / 3600);
+    const m = Math.floor((totalSeg % 3600) / 60);
+    const s = totalSeg % 60;
+    const txt = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    el.textContent = `⏱ ${txt}`;
+    el.className = 'room-timer ' + (h < 3 ? 'ok' : h < 4 ? 'warning' : 'exceeded');
+  });
+}
+
 async function loadHabitaciones() {
   let query = sb.from('habitaciones').select('*').order('numero');
   const estado = document.getElementById('filter-estado')?.value;
   if(estado) query = query.eq('estado', estado);
-  const { data } = await query;
-  renderRoomsGrid(data||[]);
+  const { data:rooms } = await query;
+
+  // Fetch active check-in timestamps for occupied rooms
+  if (rooms?.length) {
+    const ocupadasIds = rooms.filter(r=>r.estado==='ocupado').map(r=>r.id);
+    if (ocupadasIds.length) {
+      const { data:cis } = await sb.from('check_ins')
+        .select('habitacion_id, created_at, check_in_fecha')
+        .in('habitacion_id', ocupadasIds)
+        .is('check_out_real', null);
+      cis?.forEach(ci => {
+        const rm = rooms.find(r=>r.id===ci.habitacion_id);
+        if (rm) rm._checkin_ts = ci.created_at || (ci.check_in_fecha + 'T00:00:00Z');
+      });
+    }
+  }
+
+  renderRoomsGrid(rooms||[]);
+
+  // Start/restart timer interval
+  if (_timerInterval) clearInterval(_timerInterval);
+  _timerInterval = setInterval(actualizarTimers, 1000);
+  actualizarTimers();
 
   const fe=document.getElementById('filter-estado');
   if(fe&&!fe._bound){fe._bound=true;fe.addEventListener('change',loadHabitaciones);}
-  // Quitar filtro de piso ya que ahora agrupamos por categoría
   const fp=document.getElementById('filter-piso');
   if(fp) fp.style.display='none';
+  // Admin button
+  const adminBtn = document.getElementById('btn-nueva-hab-admin');
+  if(adminBtn) adminBtn.style.display = currentUserProfile?.rol==='admin' ? 'inline-flex' : 'none';
 }
 
 const CATEGORIAS_ORDEN = ['economico','premium','suite'];
@@ -293,6 +333,7 @@ function renderRoomsGrid(rooms) {
                 </div>
                 <div class="room-card-icon">${roomIcon(r.estado)}</div>
               </div>
+              ${r.estado==='ocupado' && r._checkin_ts ? `<div class="room-timer ok" data-checkin-inicio="${r._checkin_ts}">⏱ 00:00:00</div>` : ''}
               <div class="room-card-status status-${r.estado||'disponible'}">
                 <span>${(r.estado||'DISPONIBLE').toUpperCase()}</span>
                 <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
@@ -349,17 +390,26 @@ async function openRoomModal(id) {
     });
   }
 
-  const estados=['disponible','ocupado','limpieza','mantenimiento','reservado'].filter(e=>e!==room.estado);
-  // Solo admin cambia estado sin check-in, edita y elimina
-  if(currentUserProfile?.rol==='admin'){
+  // Estados permitidos según rol:
+  // Admin: todos. Otros: limpieza, disponible, mantenimiento, reservado (NO ocupado sin checkin)
+  const isAdmin = currentUserProfile?.rol === 'admin';
+  const estadosPermitidos = isAdmin
+    ? ['disponible','ocupado','limpieza','mantenimiento','reservado']
+    : ['disponible','limpieza','mantenimiento','reservado'];
+  const estadosCambiables = estadosPermitidos.filter(e=>e!==room.estado);
+
+  if (estadosCambiables.length > 0) {
     const ss=document.createElement('select'); ss.className='sys-select';
-    ss.innerHTML=`<option value="">Cambiar estado...</option>`+estados.map(e=>`<option value="${e}">${e}</option>`).join('');
+    ss.innerHTML=`<option value="">Cambiar estado...</option>`+estadosCambiables.map(e=>`<option value="${e}">${e}</option>`).join('');
     ss.addEventListener('change',async()=>{
       if(!ss.value) return;
       await sb.from('habitaciones').update({estado:ss.value}).eq('id',id);
       showToast('Estado actualizado','ok'); closeModal('modal-habitacion'); loadHabitaciones();
     });
     actions.appendChild(ss);
+  }
+  // Solo admin puede editar y eliminar habitaciones
+  if(isAdmin){
     addBtn(actions,'✏️ Editar','sys-btn-outline',()=>{closeModal('modal-habitacion');editarHabitacion(id);});
     addBtn(actions,'🗑 Eliminar','sys-btn-red sys-btn-sm',()=>{closeModal('modal-habitacion');eliminarHabitacion(id);});
   }
@@ -1204,7 +1254,10 @@ async function filtrarComprobantes(){
         <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.cliente||'—'}<br><span style="font-size:10px;color:var(--text-light)">${c.descripcion||''}</span></td>
         <td>${c.metodo_pago||'—'}</td>
         <td><strong>S/. ${c.total?.toFixed(2)}</strong></td>
-        <td><button class="sys-btn sys-btn-outline sys-btn-sm" onclick="reimprimirComp(${c.id})">🖨 Reimprimir</button></td>
+        <td style="white-space:nowrap">
+            <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="reimprimirComp(${c.id})">🖨 Reimprimir</button>
+            ${currentUserProfile?.rol==='admin'?`<button class="sys-btn sys-btn-outline sys-btn-sm" style="margin-left:4px" onclick="editarMetodoPago(${c.id})">✏️ Pago</button>`:''}
+          </td>
       </tr>`).join('')
     :'<tr><td colspan="7" class="empty-row">No hay comprobantes en este rango</td></tr>';
 }
@@ -1424,19 +1477,57 @@ async function marcarLeido(id){
 //  NOTIFICACIONES REALTIME
 // ══════════════════════════════════════════════════════════
 let _notifChannel=null;
+
+// Sonido de notificación (beep sintético con Web Audio API)
+function reproducirSonidoNotif() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const playBeep = (freq, start, duration) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + duration);
+    };
+    playBeep(880, 0,    0.15);
+    playBeep(1100, 0.18, 0.15);
+    playBeep(1320, 0.36, 0.2);
+  } catch(e) {}
+}
+
+let _lastNotifCount = 0;
+
 async function initNotificaciones(){
   await cargarNotificaciones();
-  if(_notifChannel) sb.removeChannel(_notifChannel);
-  _notifChannel=sb.channel('notif-ch')
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'notificaciones'},
-      payload=>{mostrarNotifToast(payload.new);cargarNotificaciones();})
-    .subscribe();
+  if(_notifChannel) { try{ sb.removeChannel(_notifChannel); }catch(e){} }
+  _notifChannel = sb.channel('notif-realtime-' + Date.now(), {
+    config: { broadcast: { self: true } }
+  })
+  .on('postgres_changes', {
+    event: 'INSERT', schema: 'public', table: 'notificaciones'
+  }, payload => {
+    reproducirSonidoNotif();
+    mostrarNotifToast(payload.new);
+    cargarNotificaciones();
+  })
+  .subscribe((status) => {
+    console.log('Notif channel status:', status);
+  });
 }
 async function cargarNotificaciones(){
   const { data:notifs } = await sb.from('notificaciones').select('*').eq('leida',false).order('created_at',{ascending:false}).limit(20);
   const count=notifs?.length||0;
   const badge=document.getElementById('notif-badge');
   if(badge){badge.textContent=count;badge.style.display=count>0?'flex':'none';}
+  // Play sound if new notifications appeared (polling fallback)
+  if(count > _lastNotifCount && _lastNotifCount >= 0) {
+    if(_lastNotifCount >= 0 && count > 0) { /* sound already played by realtime */ }
+  }
+  _lastNotifCount = count;
   const list=document.getElementById('notif-list');
   if(!list) return;
   list.innerHTML=notifs?.length
@@ -1447,7 +1538,15 @@ async function cargarNotificaciones(){
       </div>`).join('')
     :'<div class="notif-empty">Sin notificaciones nuevas</div>';
 }
-function mostrarNotifToast(n){showToast(`🔔 ${n.titulo}: ${n.mensaje}`,'ok');}
+function mostrarNotifToast(n){
+  showToast(`🔔 ${n.titulo}: ${n.mensaje}`,'ok');
+  // Flash notification bell
+  const bell = document.getElementById('notif-btn');
+  if(bell) {
+    bell.style.animation = 'bellRing 0.6s ease 3';
+    setTimeout(() => { bell.style.animation = ''; }, 2000);
+  }
+}
 async function abrirNotif(id,tipo){
   await sb.from('notificaciones').update({leida:true}).eq('id',id);
   closeNotifPanel();
@@ -1491,8 +1590,18 @@ document.getElementById('btn-guardar-metodo')?.addEventListener('click',async()=
   const modal=document.getElementById('modal-editar-metodo');
   const metodo=modal.querySelector('.metodo-btn.active')?.dataset.metodo;
   if(!metodo||!id) return;
-  await sb.from('comprobantes').update({metodo_pago:metodo}).eq('id',id);
-  showToast('Método actualizado ✓','ok'); closeModal('modal-editar-metodo'); loadComprobantes();
+  // Also update datos_json so reprint shows updated method
+  const { data:comp } = await sb.from('comprobantes').select('datos_json').eq('id',id).single();
+  let updateData = { metodo_pago: metodo };
+  if(comp?.datos_json) {
+    try {
+      const datos = typeof comp.datos_json==='string' ? JSON.parse(comp.datos_json) : comp.datos_json;
+      datos.metodoPago = metodo;
+      updateData.datos_json = JSON.stringify(datos);
+    } catch(e){}
+  }
+  await sb.from('comprobantes').update(updateData).eq('id',id);
+  showToast('Método de pago actualizado ✓','ok'); closeModal('modal-editar-metodo'); loadComprobantes();
 });
 
 // ══════════════════════════════════════════════════════════

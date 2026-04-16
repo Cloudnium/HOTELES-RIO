@@ -50,13 +50,13 @@ const habitaciones = [
       Diseñada con una estética contemporánea y acabados de alta gama, cuenta con una zona de 
       descanso independiente, un área de estar pensada para la máxima relajación y vistas 
       privilegiadas al jardín.`,
-    precio: 280,
+    precio: 120,
     // IMAGEN: coloca tu foto en public/images/rooms/suite.jpg
     imagen: '/images/rooms/suite.jpg',
     imagenAlt: 'Habitación Suite - Hoteles Rio',
-    amenidades: ['Wi-Fi gratis', 'Aire acondicionado', 'Jacuzzi', 'TV Smart', 'Minibar', 'Caja fuerte'],
+    amenidades: ['Wi-Fi gratis', 'Aire acondicionado', 'Jacuzzi', 'TV Smart', 'Minibar'],
     capacidad: '2 personas',
-    camas: '1 cama King'
+    camas: '1 cama'
   },
   {
     id: 'premium',
@@ -68,13 +68,13 @@ const habitaciones = [
     descripcionLarga: `La habitación Premium ofrece un ambiente superior, diseñado para huéspedes 
       que valoran los detalles. Con una distribución fluida y una selección de materiales premium, 
       este espacio invita al descanso profundo con todas las comodidades que usted merece.`,
-    precio: 180,
+    precio: 100,
     // IMAGEN: coloca tu foto en public/images/rooms/premium.jpg
     imagen: '/images/rooms/premium.jpg',
     imagenAlt: 'Habitación Premium - Hoteles Rio',
     amenidades: ['Wi-Fi gratis', 'Aire acondicionado', 'Bañera', 'TV Smart', 'Minibar'],
     capacidad: '2 personas',
-    camas: '1 cama Queen o 2 camas simples'
+    camas: '1 cama'
   },
   {
     id: 'economico',
@@ -86,13 +86,13 @@ const habitaciones = [
     descripcionLarga: `Nuestra habitación Económica combina confort y funcionalidad al mejor precio. 
       Una opción inteligente que no renuncia a la calidad ni al bienestar. Perfecta para estancias 
       cortas o viajeros que priorizan la practicidad.`,
-    precio: 100,
+    precio: 80,
     // IMAGEN: coloca tu foto en public/images/rooms/economico.jpg
     imagen: '/images/rooms/economico.jpg',
     imagenAlt: 'Habitación Económica - Hoteles Rio',
     amenidades: ['Wi-Fi gratis', 'Aire acondicionado', 'Ducha', 'TV'],
     capacidad: '2 personas',
-    camas: '1 cama matrimonial o 2 camas simples'
+    camas: '1 cama'
   }
 ];
 
@@ -187,35 +187,30 @@ app.post('/contacto', async (req, res) => {
   let enviado = false;
   let errorEnvio = false;
 
-  try {
-    // CONFIGURA tu correo en el archivo .env
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
+  // Guardar en Supabase SIEMPRE (antes del intento de email)
+  await sbServer.from('comentarios_web').insert({ nombre, email, asunto:asunto||null, mensaje, leido:false }).catch(e=>console.error('Supabase comentario error:',e));
+  await sbServer.from('notificaciones').insert({ tipo:'comentario_web', titulo:'Nuevo Mensaje Web', mensaje:nombre+': '+(asunto||mensaje.substring(0,60)), leida:false }).catch(()=>{});
 
-    await transporter.sendMail({
-      from: `"${nombre}" <${process.env.EMAIL_USER}>`,
-      to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-      subject: `[Hoteles Rio] Contacto: ${asunto || 'Sin asunto'}`,
-      html: `
-        <h2>Nuevo mensaje desde el sitio web</h2>
-        <p><strong>Nombre:</strong> ${nombre}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Mensaje:</strong><br>${mensaje}</p>
-      `
-    });
-    enviado = true;
-    await sbServer.from('comentarios_web').insert({ nombre, email, asunto:asunto||null, mensaje, leido:false }).catch(()=>{});
-    await sbServer.from('notificaciones').insert({ tipo:'comentario_web', titulo:'Nuevo Mensaje Web', mensaje:nombre+': '+(asunto||mensaje.substring(0,60)), leida:false }).catch(()=>{});
-  } catch (err) {
-    console.error('Error enviando correo:', err.message);
-    errorEnvio = true;
-    await sbServer.from('comentarios_web').insert({ nombre, email, asunto:asunto||null, mensaje, leido:false }).catch(()=>{});
-    await sbServer.from('notificaciones').insert({ tipo:'comentario_web', titulo:'Nuevo Mensaje Web', mensaje:nombre+': '+(asunto||mensaje.substring(0,60)), leida:false }).catch(()=>{});
+  // Intentar enviar email solo si está configurado
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+      });
+      await transporter.sendMail({
+        from: `"${nombre}" <${process.env.EMAIL_USER}>`,
+        to: process.env.EMAIL_TO || process.env.EMAIL_USER,
+        subject: `[Hoteles Rio] Contacto: ${asunto || 'Sin asunto'}`,
+        html: `<h2>Nuevo mensaje</h2><p><strong>Nombre:</strong> ${nombre}</p><p><strong>Email:</strong> ${email}</p><p><strong>Mensaje:</strong><br>${mensaje}</p>`
+      });
+      enviado = true;
+    } catch (err) {
+      console.error('Error enviando correo:', err.message);
+      errorEnvio = false; // El mensaje ya se guardó en Supabase, no es un error crítico
+    }
+  } else {
+    enviado = true; // Se guardó en Supabase correctamente
   }
 
   res.render('contacto', {

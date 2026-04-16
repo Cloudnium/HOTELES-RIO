@@ -346,3 +346,13 @@ CREATE POLICY "auth_all_notif" ON notificaciones FOR ALL TO authenticated USING 
 -- IMPORTANTE: En Supabase Dashboard → Table Editor → tabla "notificaciones" → activar "Realtime"
 -- También: Database → Replication → habilitar tabla notificaciones
 
+
+-- ══════════════════════════════════════════════════════════
+--  ACTIVAR REALTIME PARA NOTIFICACIONES (IMPORTANTE)
+-- ══════════════════════════════════════════════════════════
+-- En Supabase Dashboard:
+-- 1. Ve a "Database" → "Replication"  
+-- 2. Busca la tabla "notificaciones"
+-- 3. Activa el toggle "Source" para esa tabla
+-- O alternativamente desde SQL Editor:
+ALTER PUBLICATION supabase_realtime ADD TABLE notificaciones;
