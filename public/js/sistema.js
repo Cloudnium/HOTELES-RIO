@@ -2,8 +2,8 @@
 //  sistema.js — Sistema de Gestión Interna Hoteles Rio v5
 // ============================================================
 
-const SUPABASE_URL      = 'https://fqxhrpimdskvfnupjhxs.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxeGhycGltZHNrdmZudXBqaHhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyOTQ0MTksImV4cCI6MjA5MTg3MDQxOX0.08VbFHp6m5s3E5LniyMwEm61eamIM03hdIHx-gQ4jJs';
+const SUPABASE_URL      = 'https://jyzteirrmjangptekmgm.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5enRlaXJybWphbmdwdGVrbWdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMjExNTYsImV4cCI6MjA5MTY5NzE1Nn0.Qc85njSX6BE15i3w8WN2SJ8t1vYzAzPDrP_9FRkQQCk';
 
 const { createClient } = supabase;
 // persistSession:true garantiza que la sesión sobrevive cambios de pestaña/ventana
@@ -241,36 +241,19 @@ async function registrarComprobante({ serie, tipo, descripcion, cliente, total, 
 //  HABITACIONES — agrupadas por categoría
 // ══════════════════════════════════════════════════════════
 let _timerInterval = null;
-const LIMITE_HORAS = 4;
 
 function actualizarTimers() {
-  document.querySelectorAll('[data-checkin-ts]').forEach(el => {
-    const inicio = new Date(el.dataset.checkinTs);
-    if (isNaN(inicio.getTime())) return;
-    const transcurrido = Date.now() - inicio.getTime();
-    const limite = LIMITE_HORAS * 3600 * 1000;
-    const restante = limite - transcurrido; // puede ser negativo si pasó el límite
-    
-    let h, m, s, clss, txt;
-    if (restante > 0) {
-      // Tiempo restante (cuenta regresiva)
-      const seg = Math.ceil(restante / 1000);
-      h = Math.floor(seg / 3600);
-      m = Math.floor((seg % 3600) / 60);
-      s = seg % 60;
-      txt = `⏱ ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-      clss = h >= 1 ? 'room-timer ok' : 'room-timer warning'; // último hora = amarillo
-    } else {
-      // Tiempo excedido — mostrar cuánto se pasó
-      const seg = Math.floor(Math.abs(restante) / 1000);
-      h = Math.floor(seg / 3600);
-      m = Math.floor((seg % 3600) / 60);
-      s = seg % 60;
-      txt = `⚠️ +${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-      clss = 'room-timer exceeded';
-    }
-    el.textContent = txt;
-    el.className = clss;
+  document.querySelectorAll('[data-checkin-inicio]').forEach(el => {
+    const inicio = new Date(el.dataset.checkinInicio);
+    if(isNaN(inicio)) return;
+    const diffMs = Date.now() - inicio.getTime();
+    const totalSeg = Math.floor(diffMs / 1000);
+    const h = Math.floor(totalSeg / 3600);
+    const m = Math.floor((totalSeg % 3600) / 60);
+    const s = totalSeg % 60;
+    const txt = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    el.textContent = `⏱ ${txt}`;
+    el.className = 'room-timer ' + (h < 3 ? 'ok' : h < 4 ? 'warning' : 'exceeded');
   });
 }
 
@@ -278,26 +261,26 @@ async function loadHabitaciones() {
   let query = sb.from('habitaciones').select('*').order('numero');
   const estado = document.getElementById('filter-estado')?.value;
   if(estado) query = query.eq('estado', estado);
-  const { data: rooms } = await query;
+  const { data:rooms } = await query;
 
-  // Traer timestamps de check-ins activos para el timer
+  // Fetch active check-in timestamps for occupied rooms
   if (rooms?.length) {
-    const ocupIds = rooms.filter(r=>r.estado==='ocupado').map(r=>r.id);
-    if (ocupIds.length) {
-      const { data: cis } = await sb.from('check_ins')
+    const ocupadasIds = rooms.filter(r=>r.estado==='ocupado').map(r=>r.id);
+    if (ocupadasIds.length) {
+      const { data:cis } = await sb.from('check_ins')
         .select('habitacion_id, created_at, check_in_fecha')
-        .in('habitacion_id', ocupIds)
+        .in('habitacion_id', ocupadasIds)
         .is('check_out_real', null);
       cis?.forEach(ci => {
-        const rm = rooms.find(r => r.id === ci.habitacion_id);
-        if (rm) rm._checkin_ts = ci.created_at || (ci.check_in_fecha + 'T00:00:00');
+        const rm = rooms.find(r=>r.id===ci.habitacion_id);
+        if (rm) rm._checkin_ts = ci.created_at || (ci.check_in_fecha + 'T00:00:00Z');
       });
     }
   }
 
   renderRoomsGrid(rooms||[]);
 
-  // Reiniciar intervalo del timer
+  // Start/restart timer interval
   if (_timerInterval) clearInterval(_timerInterval);
   _timerInterval = setInterval(actualizarTimers, 1000);
   actualizarTimers();
@@ -306,9 +289,9 @@ async function loadHabitaciones() {
   if(fe&&!fe._bound){fe._bound=true;fe.addEventListener('change',loadHabitaciones);}
   const fp=document.getElementById('filter-piso');
   if(fp) fp.style.display='none';
-  // Botón admin nueva habitación
-  const adminBtn=document.getElementById('btn-nueva-hab-admin');
-  if(adminBtn) adminBtn.style.display=currentUserProfile?.rol==='admin'?'inline-flex':'none';
+  // Admin button
+  const adminBtn = document.getElementById('btn-nueva-hab-admin');
+  if(adminBtn) adminBtn.style.display = currentUserProfile?.rol==='admin' ? 'inline-flex' : 'none';
 }
 
 const CATEGORIAS_ORDEN = ['economico','premium','suite'];
@@ -350,7 +333,7 @@ function renderRoomsGrid(rooms) {
                 </div>
                 <div class="room-card-icon">${roomIcon(r.estado)}</div>
               </div>
-              ${r.estado==='ocupado'&&r._checkin_ts?`<div class="room-timer ok" data-checkin-ts="${r._checkin_ts}">⏱ 04:00:00</div>`:''}
+              ${r.estado==='ocupado' && r._checkin_ts ? `<div class="room-timer ok" data-checkin-inicio="${r._checkin_ts}">⏱ 00:00:00</div>` : ''}
               <div class="room-card-status status-${r.estado||'disponible'}">
                 <span>${(r.estado||'DISPONIBLE').toUpperCase()}</span>
                 <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
@@ -407,40 +390,26 @@ async function openRoomModal(id) {
     });
   }
 
+  // Estados permitidos según rol:
+  // Admin: todos. Otros: limpieza, disponible, mantenimiento, reservado (NO ocupado sin checkin)
   const isAdmin = currentUserProfile?.rol === 'admin';
-  const tieneCheckinActivo = !!checkinActivo;
-
-  // Estados disponibles según rol y situación:
-  // - Si hay check-in activo: NO mostrar "disponible" (solo se libera vía checkout)
-  // - Todos: limpieza, mantenimiento, reservado
-  // - Solo admin: disponible (sin checkin activo), ocupado
-  let estadosPermitidos;
-  if (tieneCheckinActivo) {
-    // Habitación con huésped adentro — solo se puede marcar limpieza/mantenimiento/reservado
-    // NO disponible (evita liberar sin hacer checkout)
-    estadosPermitidos = isAdmin
-      ? ['limpieza','mantenimiento','reservado']
-      : ['limpieza','mantenimiento','reservado'];
-  } else {
-    estadosPermitidos = isAdmin
-      ? ['disponible','ocupado','limpieza','mantenimiento','reservado']
-      : ['disponible','limpieza','mantenimiento','reservado'];
-  }
-  // Quitar el estado actual
-  const estadosCambiables = estadosPermitidos.filter(e => e !== room.estado);
+  const estadosPermitidos = isAdmin
+    ? ['disponible','ocupado','limpieza','mantenimiento','reservado']
+    : ['disponible','limpieza','mantenimiento','reservado'];
+  const estadosCambiables = estadosPermitidos.filter(e=>e!==room.estado);
 
   if (estadosCambiables.length > 0) {
-    const ss = document.createElement('select'); ss.className = 'sys-select';
-    ss.innerHTML = `<option value="">Cambiar estado...</option>` + estadosCambiables.map(e=>`<option value="${e}">${e}</option>`).join('');
-    ss.addEventListener('change', async () => {
-      if (!ss.value) return;
-      await sb.from('habitaciones').update({estado: ss.value}).eq('id', id);
+    const ss=document.createElement('select'); ss.className='sys-select';
+    ss.innerHTML=`<option value="">Cambiar estado...</option>`+estadosCambiables.map(e=>`<option value="${e}">${e}</option>`).join('');
+    ss.addEventListener('change',async()=>{
+      if(!ss.value) return;
+      await sb.from('habitaciones').update({estado:ss.value}).eq('id',id);
       showToast('Estado actualizado','ok'); closeModal('modal-habitacion'); loadHabitaciones();
     });
     actions.appendChild(ss);
   }
-  // Solo admin puede editar o eliminar la habitación
-  if (isAdmin) {
+  // Solo admin puede editar y eliminar habitaciones
+  if(isAdmin){
     addBtn(actions,'✏️ Editar','sys-btn-outline',()=>{closeModal('modal-habitacion');editarHabitacion(id);});
     addBtn(actions,'🗑 Eliminar','sys-btn-red sys-btn-sm',()=>{closeModal('modal-habitacion');eliminarHabitacion(id);});
   }
@@ -1081,21 +1050,17 @@ async function toggleProduct(id,estado){await sb.from('productos').update({activ
 //  CAJAS — con histórico por fecha y ticket de cierre
 // ══════════════════════════════════════════════════════════
 async function loadCajas(){
-  const hoy=fechaPeruHoy(); // siempre UTC-5 Perú
-  // Inicializar filtro de fecha sin restricciones de calendario
+  const hoy=new Date().toISOString().split('T')[0];
+  // Inicializar filtro de fecha si no tiene valor
   const fecInput=document.getElementById('caja-hist-fecha');
-  if(fecInput){
-    fecInput.removeAttribute('min');
-    fecInput.removeAttribute('max');
-    if(!fecInput.value) fecInput.value=hoy;
-  }
+  if(fecInput&&!fecInput.value) fecInput.value=hoy;
   const fechaFiltro=fecInput?.value||hoy;
   document.getElementById('caja-fecha').textContent=fechaFiltro;
 
   const { data:cajas } = await sb.from('cajas').select('*, usuarios(nombre)').eq('fecha',fechaFiltro).order('created_at');
 
-  // Actualizar cajaActual si es hoy (usar fechaPeruHoy() no la var local)
-  if(fechaFiltro===fechaPeruHoy()) cajaActual=cajas?.find(c=>c.usuario_id===currentUserProfile?.id&&c.estado==='abierta')||cajaActual||null;
+  // Actualizar cajaActual si es hoy
+  if(fechaFiltro===hoy) cajaActual=cajas?.find(c=>c.usuario_id===currentUserProfile?.id&&c.estado==='abierta')||cajaActual||null;
 
   const grid=document.getElementById('cajas-grid');
   grid.innerHTML=cajas?.length
@@ -1106,7 +1071,7 @@ async function loadCajas(){
           <div class="caja-total">S/. ${(c.total||0).toFixed(2)}</div>
           <div class="caja-sub">Apertura: ${formatTime(c.created_at)}</div>
           <div class="caja-actions">
-            ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id&&fechaFiltro===fechaPeruHoy()
+            ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id&&fechaFiltro===hoy
               ?`<button class="sys-btn sys-btn-outline sys-btn-sm" onclick="cerrarCaja(${c.id})">Cerrar caja</button>`:''}
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="verDetalleCaja(${c.id})">Ver detalle</button>
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="imprimirCaja(${c.id})">🖨 Ticket</button>
@@ -1121,7 +1086,7 @@ async function loadCajas(){
   if(fecInput&&!fecInput._bound){fecInput._bound=true;fecInput.addEventListener('change',loadCajas);}
 
   // Mostrar movimientos de la caja activa del usuario para HOY
-  if(cajaActual&&fechaFiltro===fechaPeruHoy()){
+  if(cajaActual&&fechaFiltro===hoy){
     const { data:movs } = await sb.from('movimientos_caja').select('*').eq('caja_id',cajaActual.id).order('created_at',{ascending:false});
     const tbody=document.getElementById('caja-movimientos');
     tbody.innerHTML=movs?.length
@@ -1291,7 +1256,7 @@ async function filtrarComprobantes(){
         <td><strong>S/. ${c.total?.toFixed(2)}</strong></td>
         <td style="white-space:nowrap">
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="reimprimirComp(${c.id})">🖨 Reimprimir</button>
-            <button class="sys-btn sys-btn-outline sys-btn-sm" style="margin-left:4px" onclick="editarMetodoPago(${c.id})">✏️ Pago</button>
+            ${currentUserProfile?.rol==='admin'?`<button class="sys-btn sys-btn-outline sys-btn-sm" style="margin-left:4px" onclick="editarMetodoPago(${c.id})">✏️ Pago</button>`:''}
           </td>
       </tr>`).join('')
     :'<tr><td colspan="7" class="empty-row">No hay comprobantes en este rango</td></tr>';
@@ -1512,42 +1477,57 @@ async function marcarLeido(id){
 //  NOTIFICACIONES REALTIME
 // ══════════════════════════════════════════════════════════
 let _notifChannel=null;
-let _lastNotifCount=0;
 
+// Sonido de notificación (beep sintético con Web Audio API)
 function reproducirSonidoNotif() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    [[880,0,0.15],[1100,0.2,0.15],[1320,0.4,0.22]].forEach(([freq,start,dur])=>{
-      const osc=ctx.createOscillator(), gain=ctx.createGain();
+    const playBeep = (freq, start, duration) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
       osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value=freq; osc.type='sine';
-      gain.gain.setValueAtTime(0.35, ctx.currentTime+start);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+start+dur);
-      osc.start(ctx.currentTime+start); osc.stop(ctx.currentTime+start+dur);
-    });
-  } catch(e){}
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + duration);
+    };
+    playBeep(880, 0,    0.15);
+    playBeep(1100, 0.18, 0.15);
+    playBeep(1320, 0.36, 0.2);
+  } catch(e) {}
 }
 
-function animarCampana(){
-  const bell=document.getElementById('notif-btn');
-  if(!bell) return;
-  bell.style.animation='bellRing 0.6s ease 3';
-  setTimeout(()=>{ bell.style.animation=''; },2000);
-}
+let _lastNotifCount = 0;
 
 async function initNotificaciones(){
   await cargarNotificaciones();
-  if(_notifChannel) sb.removeChannel(_notifChannel);
-  _notifChannel=sb.channel('notif-ch')
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'notificaciones'},
-      payload=>{reproducirSonidoNotif();animarCampana();mostrarNotifToast(payload.new);cargarNotificaciones();})
-    .subscribe();
+  if(_notifChannel) { try{ sb.removeChannel(_notifChannel); }catch(e){} }
+  _notifChannel = sb.channel('notif-realtime-' + Date.now(), {
+    config: { broadcast: { self: true } }
+  })
+  .on('postgres_changes', {
+    event: 'INSERT', schema: 'public', table: 'notificaciones'
+  }, payload => {
+    reproducirSonidoNotif();
+    mostrarNotifToast(payload.new);
+    cargarNotificaciones();
+  })
+  .subscribe((status) => {
+    console.log('Notif channel status:', status);
+  });
 }
 async function cargarNotificaciones(){
   const { data:notifs } = await sb.from('notificaciones').select('*').eq('leida',false).order('created_at',{ascending:false}).limit(20);
   const count=notifs?.length||0;
   const badge=document.getElementById('notif-badge');
   if(badge){badge.textContent=count;badge.style.display=count>0?'flex':'none';}
+  // Play sound if new notifications appeared (polling fallback)
+  if(count > _lastNotifCount && _lastNotifCount >= 0) {
+    if(_lastNotifCount >= 0 && count > 0) { /* sound already played by realtime */ }
+  }
+  _lastNotifCount = count;
   const list=document.getElementById('notif-list');
   if(!list) return;
   list.innerHTML=notifs?.length
@@ -1558,7 +1538,15 @@ async function cargarNotificaciones(){
       </div>`).join('')
     :'<div class="notif-empty">Sin notificaciones nuevas</div>';
 }
-function mostrarNotifToast(n){showToast(`🔔 ${n.titulo}: ${n.mensaje}`,'ok');}
+function mostrarNotifToast(n){
+  showToast(`🔔 ${n.titulo}: ${n.mensaje}`,'ok');
+  // Flash notification bell
+  const bell = document.getElementById('notif-btn');
+  if(bell) {
+    bell.style.animation = 'bellRing 0.6s ease 3';
+    setTimeout(() => { bell.style.animation = ''; }, 2000);
+  }
+}
 async function abrirNotif(id,tipo){
   await sb.from('notificaciones').update({leida:true}).eq('id',id);
   closeNotifPanel();
@@ -1585,7 +1573,7 @@ document.addEventListener('click',e=>{
 //  EDITAR MÉTODO DE PAGO COMPROBANTE (solo admin)
 // ══════════════════════════════════════════════════════════
 async function editarMetodoPago(id){
-  // Todos los usuarios autenticados pueden corregir el método de pago
+  if(currentUserProfile?.rol!=='admin'){showToast('Solo el administrador puede editar comprobantes','err');return;}
   const { data:comp } = await sb.from('comprobantes').select('serie,metodo_pago').eq('id',id).single();
   if(!comp) return;
   document.getElementById('edit-comp-id').value=id;
@@ -1602,17 +1590,17 @@ document.getElementById('btn-guardar-metodo')?.addEventListener('click',async()=
   const modal=document.getElementById('modal-editar-metodo');
   const metodo=modal.querySelector('.metodo-btn.active')?.dataset.metodo;
   if(!metodo||!id) return;
-  // Actualizar metodo_pago Y datos_json para que reimpresión salga correcta
+  // Also update datos_json so reprint shows updated method
   const { data:comp } = await sb.from('comprobantes').select('datos_json').eq('id',id).single();
-  const upd = { metodo_pago: metodo };
-  if(comp?.datos_json){
+  let updateData = { metodo_pago: metodo };
+  if(comp?.datos_json) {
     try {
-      const d = typeof comp.datos_json==='string' ? JSON.parse(comp.datos_json) : comp.datos_json;
-      d.metodoPago = metodo;
-      upd.datos_json = JSON.stringify(d);
+      const datos = typeof comp.datos_json==='string' ? JSON.parse(comp.datos_json) : comp.datos_json;
+      datos.metodoPago = metodo;
+      updateData.datos_json = JSON.stringify(datos);
     } catch(e){}
   }
-  await sb.from('comprobantes').update(upd).eq('id',id);
+  await sb.from('comprobantes').update(updateData).eq('id',id);
   showToast('Método de pago actualizado ✓','ok'); closeModal('modal-editar-metodo'); loadComprobantes();
 });
 

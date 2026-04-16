@@ -6,8 +6,8 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const sbServer = createClient(
-  process.env.SUPABASE_URL || 'https://fqxhrpimdskvfnupjhxs.supabase.co',
-  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxeGhycGltZHNrdmZudXBqaHhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyOTQ0MTksImV4cCI6MjA5MTg3MDQxOX0.08VbFHp6m5s3E5LniyMwEm61eamIM03hdIHx-gQ4jJs'
+  process.env.SUPABASE_URL || 'https://jyzteirrmjangptekmgm.supabase.co',
+  process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5enRlaXJybWphbmdwdGVrbWdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMjExNTYsImV4cCI6MjA5MTY5NzE1Nn0.Qc85njSX6BE15i3w8WN2SJ8t1vYzAzPDrP_9FRkQQCk'
 );
 const express = require('express');
 const { engine } = require('express-handlebars');
@@ -157,52 +157,21 @@ app.get('/reservas', (req, res) => {
 // POST Reservas — aquí puedes conectar con tu sistema de BD
 app.post('/reservas', async (req, res) => {
   const { fecha_reserva, hora_llegada, huespedes, habitacion, nombre1, dni1, nombre2, dni2, telefono, email_cliente } = req.body;
-
   console.log('Nueva reserva:', req.body);
-
   try {
-    const { data, error } = await sbServer
-      .from('reservas_web')
-      .insert([{
-        nombre_cliente: nombre1,
-        dni_cliente: dni1,
-        nombre2: nombre2 || null,
-        dni2: dni2 || null,
-        telefono: telefono || null,
-        email: email_cliente || null,
-        habitacion_tipo: habitacion,
-        fecha_reserva,
-        hora_llegada,
-        num_huespedes: parseInt(huespedes) || 1,
-        estado: 'pendiente'
-      }]);
-
-    if (error) {
-      console.error('❌ ERROR SUPABASE:', error);
-      return res.send('Error al guardar reserva');
-    }
-
-    console.log('✅ Guardado en Supabase:', data);
-
-    await sbServer.from('notificaciones').insert([{
-      tipo: 'reserva_web',
-      titulo: 'Nueva Reserva Web',
-      mensaje: nombre1 + ' — ' + habitacion + ' — ' + fecha_reserva + ' ' + hora_llegada,
-      leida: false,
-    }]).catch(()=>{});
-
-  } catch (e) {
-    console.error('💥 ERROR GENERAL:', e);
-    return res.send('Error servidor');
-  }
-
-  res.render('reservas', {
-    title: 'Reservas',
-    page: 'reservas',
-    habitaciones,
-    exito: true,
-    datosReserva: req.body
-  });
+    await sbServer.from('reservas_web').insert({
+      nombre_cliente: nombre1, dni_cliente: dni1,
+      nombre2: nombre2||null, dni2: dni2||null,
+      telefono: telefono||null, email: email_cliente||null,
+      habitacion_tipo: habitacion, fecha_reserva, hora_llegada,
+      num_huespedes: parseInt(huespedes)||1, estado:'pendiente',
+    });
+    await sbServer.from('notificaciones').insert({
+      tipo:'reserva_web', titulo:'Nueva Reserva Web',
+      mensaje: nombre1+' — '+habitacion+' — '+fecha_reserva+' '+hora_llegada, leida:false,
+    }).catch(()=>{});
+  } catch(e){ console.error('Reserva error:',e.message); }
+  res.render('reservas', { title:'Reservas', page:'reservas', habitaciones, exito:true, datosReserva:req.body });
 });
 
 app.get('/contacto', (req, res) => {
@@ -218,24 +187,11 @@ app.post('/contacto', async (req, res) => {
   let enviado = false;
   let errorEnvio = false;
 
-  // Guardar en Supabase PRIMERO (igual que reservas — no depende del email)
-  try {
-    await sbServer.from('comentarios_web').insert({
-      nombre, email, asunto: asunto||null, mensaje, leido: false
-    });
-    await sbServer.from('notificaciones').insert({
-      tipo: 'comentario_web',
-      titulo: 'Nuevo Mensaje Web',
-      mensaje: nombre + ': ' + (asunto || mensaje.substring(0, 60)),
-      leida: false
-    });
-    enviado = true;
-  } catch(dbErr) {
-    console.error('Error guardando comentario en Supabase:', dbErr.message);
-    errorEnvio = true;
-  }
+  // Guardar en Supabase SIEMPRE (antes del intento de email)
+  await sbServer.from('comentarios_web').insert({ nombre, email, asunto:asunto||null, mensaje, leido:false }).catch(e=>console.error('Supabase comentario error:',e));
+  await sbServer.from('notificaciones').insert({ tipo:'comentario_web', titulo:'Nuevo Mensaje Web', mensaje:nombre+': '+(asunto||mensaje.substring(0,60)), leida:false }).catch(()=>{});
 
-  // Intentar email solo si está configurado (no bloquea la respuesta)
+  // Intentar enviar email solo si está configurado
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     try {
       const transporter = nodemailer.createTransport({
@@ -248,9 +204,13 @@ app.post('/contacto', async (req, res) => {
         subject: `[Hoteles Rio] Contacto: ${asunto || 'Sin asunto'}`,
         html: `<h2>Nuevo mensaje</h2><p><strong>Nombre:</strong> ${nombre}</p><p><strong>Email:</strong> ${email}</p><p><strong>Mensaje:</strong><br>${mensaje}</p>`
       });
-    } catch(mailErr) {
-      console.error('Email no enviado (no crítico):', mailErr.message);
+      enviado = true;
+    } catch (err) {
+      console.error('Error enviando correo:', err.message);
+      errorEnvio = false; // El mensaje ya se guardó en Supabase, no es un error crítico
     }
+  } else {
+    enviado = true; // Se guardó en Supabase correctamente
   }
 
   res.render('contacto', {
