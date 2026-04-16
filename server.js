@@ -6,7 +6,7 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const sbServer = createClient(
-  process.env.SUPABASE_URL || 'https://fqxhrpimdskvfnupjhxs.supabase.co',
+  process.env.SUPABASE_URL || 'https://jyzteirrmjangptekmgm.supabase.co',
   process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxeGhycGltZHNrdmZudXBqaHhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyOTQ0MTksImV4cCI6MjA5MTg3MDQxOX0.08VbFHp6m5s3E5LniyMwEm61eamIM03hdIHx-gQ4jJs'
 );
 const express = require('express');
@@ -187,11 +187,24 @@ app.post('/contacto', async (req, res) => {
   let enviado = false;
   let errorEnvio = false;
 
-  // Guardar en Supabase SIEMPRE (antes del intento de email)
-  await sbServer.from('comentarios_web').insert({ nombre, email, asunto:asunto||null, mensaje, leido:false }).catch(e=>console.error('Supabase comentario error:',e));
-  await sbServer.from('notificaciones').insert({ tipo:'comentario_web', titulo:'Nuevo Mensaje Web', mensaje:nombre+': '+(asunto||mensaje.substring(0,60)), leida:false }).catch(()=>{});
+  // Guardar en Supabase PRIMERO (igual que reservas — no depende del email)
+  try {
+    await sbServer.from('comentarios_web').insert({
+      nombre, email, asunto: asunto||null, mensaje, leido: false
+    });
+    await sbServer.from('notificaciones').insert({
+      tipo: 'comentario_web',
+      titulo: 'Nuevo Mensaje Web',
+      mensaje: nombre + ': ' + (asunto || mensaje.substring(0, 60)),
+      leida: false
+    });
+    enviado = true;
+  } catch(dbErr) {
+    console.error('Error guardando comentario en Supabase:', dbErr.message);
+    errorEnvio = true;
+  }
 
-  // Intentar enviar email solo si está configurado
+  // Intentar email solo si está configurado (no bloquea la respuesta)
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     try {
       const transporter = nodemailer.createTransport({
@@ -204,13 +217,9 @@ app.post('/contacto', async (req, res) => {
         subject: `[Hoteles Rio] Contacto: ${asunto || 'Sin asunto'}`,
         html: `<h2>Nuevo mensaje</h2><p><strong>Nombre:</strong> ${nombre}</p><p><strong>Email:</strong> ${email}</p><p><strong>Mensaje:</strong><br>${mensaje}</p>`
       });
-      enviado = true;
-    } catch (err) {
-      console.error('Error enviando correo:', err.message);
-      errorEnvio = false; // El mensaje ya se guardó en Supabase, no es un error crítico
+    } catch(mailErr) {
+      console.error('Email no enviado (no crítico):', mailErr.message);
     }
-  } else {
-    enviado = true; // Se guardó en Supabase correctamente
   }
 
   res.render('contacto', {
