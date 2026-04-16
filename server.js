@@ -185,12 +185,16 @@ app.post('/reservas', async (req, res) => {
     console.log('✅ Guardado en Supabase:', data);
 
     // Notificación (opcional)
-    await sbServer.from('notificaciones').insert([{
-      tipo: 'reserva_web',
-      titulo: 'Nueva Reserva Web',
-      mensaje: `${nombre1} — ${habitacion} — ${fecha_reserva} ${hora_llegada}`,
-      leida: false,
-    }]).catch(()=>{});
+    try {
+  await sbServer.from('notificaciones').insert([{
+    tipo: 'reserva_web',
+    titulo: 'Nueva Reserva Web',
+    mensaje: nombre1 + ' — ' + habitacion + ' — ' + fecha_reserva + ' ' + hora_llegada,
+    leida: false,
+  }]);
+} catch (err) {
+  console.log('⚠️ Error en notificación:', err.message);
+}
 
     res.render('reservas', {
       title: 'Reservas',
