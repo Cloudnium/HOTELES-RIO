@@ -462,22 +462,34 @@ async function confirmarCheckin(habId) {
 async function openCheckoutModal(room,checkin) {
   if(!requireCaja('hacer check-out')) return;
   document.getElementById('co-hab-num').textContent=String(room.numero).padStart(3,'0');
-  const entrada=new Date(checkin.check_in_fecha),hoy=new Date();
-  const noches=Math.max(1,Math.ceil((hoy-entrada)/(1000*60*60*24)));
-  const totalHab=noches*(checkin.precio_noche||0);
+
+  // Precio FIJO de la habitación (se paga 1 sola vez, independiente de las horas)
+  const totalHab = checkin.precio_noche || 0;
+
   const { data:consumos } = await sb.from('consumos_habitacion')
     .select('*, productos(nombre)').eq('check_in_id',checkin.id).is('cobrado',false);
   const totalConsumos=consumos?.reduce((s,c)=>s+(c.precio_total||0),0)||0;
-  const totalGeneral=totalHab+totalConsumos;
+  const totalBase = totalHab + totalConsumos; // sin sanción todavía
+
+  // Calcular tiempo transcurrido para mostrar info
+  const ciTS = checkin.created_at || (checkin.check_in_fecha + 'T00:00:00');
+  const horasUsadas = (Date.now() - new Date(ciTS).getTime()) / 3600000;
+  const excedido = horasUsadas > 4;
+  const excesoHoras = excedido ? (horasUsadas - 4).toFixed(1) : 0;
+
   const summary=document.getElementById('checkout-summary');
   summary.innerHTML=`
     <div class="checkout-row"><span>Huésped</span><span>${checkin.nombre_huesped}</span></div>
-    <div class="checkout-row"><span>Noches</span><span>${noches}</span></div>
-    <div class="checkout-row"><span>Precio x noche</span><span>S/. ${(checkin.precio_noche||0).toFixed(2)}</span></div>
-    <div class="checkout-row"><span>Total habitación</span><span>S/. ${totalHab.toFixed(2)}</span></div>
+    <div class="checkout-row"><span>Tiempo usado</span><span>${horasUsadas.toFixed(1)}h de 4h${excedido?` <span style="color:var(--danger);font-weight:700">(+${excesoHoras}h extra)</span>`:''}</span></div>
+    <div class="checkout-row"><span>Precio habitación</span><span>S/. ${totalHab.toFixed(2)}</span></div>
     ${consumos?.map(c=>`<div class="checkout-row"><span>&nbsp;• ${c.productos?.nombre} x${c.cantidad}</span><span>S/. ${c.precio_total?.toFixed(2)}</span></div>`).join('')||''}
-    <div class="checkout-row"><span>Consumos extras</span><span>S/. ${totalConsumos.toFixed(2)}</span></div>
-    <div class="checkout-row checkout-total"><span>TOTAL A COBRAR</span><span>S/. ${totalGeneral.toFixed(2)}</span></div>
+    ${totalConsumos>0?`<div class="checkout-row"><span>Consumos extras</span><span>S/. ${totalConsumos.toFixed(2)}</span></div>`:''}
+    ${excedido?`
+    <div class="checkout-row" style="background:var(--warning-light);border-radius:6px;padding:8px;">
+      <span style="color:var(--warning);font-weight:600">⚠️ Sanción por tiempo extra</span>
+      <span><input type="number" id="monto-sancion" class="sys-input" placeholder="0.00" step="0.01" min="0" style="width:90px;text-align:right" oninput="recalcularTotal()"> S/.</span>
+    </div>`:''}
+    <div class="checkout-row checkout-total" id="row-total"><span>TOTAL A COBRAR</span><span id="total-cobrar-display">S/. ${totalBase.toFixed(2)}</span></div>
     <div class="pago-section">
       <div class="form-field"><label>Método de pago</label>
         <div class="metodo-pago-grid">
@@ -489,63 +501,63 @@ async function openCheckoutModal(room,checkin) {
       </div>
       <div id="efectivo-section" class="efectivo-section">
         <div class="form-field"><label>Efectivo recibido (S/.)</label>
-          <input type="number" id="efectivo-recibido" class="sys-input" step="0.01" value="${totalGeneral.toFixed(2)}">
+          <input type="number" id="efectivo-recibido" class="sys-input" step="0.01" value="${totalBase.toFixed(2)}">
         </div>
         <div class="vuelto-display">Vuelto: <strong id="vuelto-display">S/. 0.00</strong></div>
       </div>
     </div>`;
+
+  // Guardar datos base en variable global
+  window._checkoutData={room,checkin,totalBase,consumos,totalHab,totalConsumos,horasUsadas,excedido,metodoPago:'Efectivo'};
+
+  // Recalcular total cuando cambia la sanción
+  window.recalcularTotal = function() {
+    const sancion = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
+    const nuevoTotal = totalBase + sancion;
+    document.getElementById('total-cobrar-display').textContent = `S/. ${nuevoTotal.toFixed(2)}`;
+    document.getElementById('efectivo-recibido').value = nuevoTotal.toFixed(2);
+    window._checkoutData.sancion = sancion;
+  };
+
   let metodoPago='Efectivo';
   summary.querySelectorAll('.metodo-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
       summary.querySelectorAll('.metodo-btn').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active'); metodoPago=btn.dataset.metodo;
+      window._checkoutData.metodoPago=metodoPago;
       document.getElementById('efectivo-section').style.display=metodoPago==='Efectivo'?'block':'none';
     });
   });
+
   document.getElementById('efectivo-recibido')?.addEventListener('input',e=>{
-    const v=Math.max(0,parseFloat(e.target.value||0)-totalGeneral);
+    const sancion = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
+    const totalFinal = totalBase + sancion;
+    const v=Math.max(0,parseFloat(e.target.value||0)-totalFinal);
     const vd=document.getElementById('vuelto-display');
-    vd.textContent=`S/. ${v.toFixed(2)}`; vd.style.color=v>0?'var(--gold)':'var(--text-mid)';
+    vd.textContent=`S/. ${v.toFixed(2)}`; vd.style.color=v>0?'var(--primary)':'var(--text-2)';
   });
-  window._checkoutData={room,checkin,totalGeneral,consumos,totalHab,totalConsumos,noches,metodoPago:'Efectivo'};
+
   document.getElementById('btn-confirmar-checkout').onclick=async()=>{
-    const metP=window._checkoutData.metodoPago||'Efectivo';
-    const recibido=parseFloat(document.getElementById('efectivo-recibido')?.value)||totalGeneral;
-    const vuelto=metP==='Efectivo'?Math.max(0,recibido-totalGeneral):0;
-    window._checkoutData.vuelto=vuelto; window._checkoutData.metodoPago=metP;
-    // Check 4h limit
-    const ciTS=checkin.created_at||checkin.check_in_fecha+'T12:00:00';
-    const horasUsadas=(new Date()-new Date(ciTS))/3600000;
-    if(horasUsadas>4){
-      closeModal('modal-checkout');
-      const exceso=Math.max(0,horasUsadas-4).toFixed(1);
-      document.getElementById('penalizacion-info').innerHTML=
-        `⚠️ El huésped usó <strong>${horasUsadas.toFixed(1)} horas</strong> (límite 4h). Exceso: <strong>${exceso}h</strong>.`;
-      document.getElementById('penalizacion-monto').value='';
-      openModal('modal-penalizacion');
-    } else {
-      await confirmarCheckout(room,checkin,totalGeneral,consumos,metP,vuelto,noches,totalHab,totalConsumos,0);
-    }
+    const d = window._checkoutData;
+    const metP = d.metodoPago||'Efectivo';
+    const sancion = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
+    const totalFinal = totalBase + sancion;
+    const recibido = parseFloat(document.getElementById('efectivo-recibido')?.value)||totalFinal;
+    const vuelto = metP==='Efectivo' ? Math.max(0,recibido-totalFinal) : 0;
+    await confirmarCheckout(room,checkin,totalFinal,consumos,metP,vuelto,totalHab,totalConsumos,sancion);
   };
-  // Track metodo in realtime
-  document.getElementById('checkout-summary')?.querySelectorAll('.metodo-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{window._checkoutData.metodoPago=btn.dataset.metodo||'Efectivo';});
-  });
+
   openModal('modal-checkout');
 }
+// continuarCheckout* ya no se usan - la sanción se maneja inline en openCheckoutModal
 async function continuarCheckoutSinPen(){
   closeModal('modal-penalizacion');
-  const d=window._checkoutData;
-  await confirmarCheckout(d.room,d.checkin,d.totalGeneral,d.consumos,d.metodoPago,d.vuelto||0,d.noches,d.totalHab,d.totalConsumos,0);
 }
 async function continuarCheckoutConPen(){
-  const pen=parseFloat(document.getElementById('penalizacion-monto').value)||0;
   closeModal('modal-penalizacion');
-  const d=window._checkoutData;
-  await confirmarCheckout(d.room,d.checkin,d.totalGeneral+pen,d.consumos,d.metodoPago,d.vuelto||0,d.noches,d.totalHab,d.totalConsumos,pen);
 }
 
-async function confirmarCheckout(room,checkin,total,consumos,metodoPago,vuelto,noches,totalHab,totalConsumos,penalizacion=0) {
+async function confirmarCheckout(room,checkin,total,consumos,metodoPago,vuelto,totalHab,totalConsumos,penalizacion=0) {
   await sb.from('check_ins').update({check_out_real:new Date().toISOString(),total_cobrado:total,metodo_pago:metodoPago}).eq('id',checkin.id);
   await sb.from('habitaciones').update({estado:'limpieza'}).eq('id',room.id);
   if(consumos?.length) await sb.from('consumos_habitacion').update({cobrado:true}).in('id',consumos.map(c=>c.id));
@@ -624,7 +636,7 @@ function imprimirTicketHabitacion(d) {
     <div><span class="b">DNI:</span> ${d.checkin.dni_huesped||'—'}</div>
     <div class="ln"></div>
     <table>
-      <tr><td>Hab. — ${d.noches} noche(s)</td><td class="r">S/.${d.totalHab.toFixed(2)}</td></tr>
+      <tr><td>Habitación (tarifa fija)</td><td class="r">S/.${d.totalHab.toFixed(2)}</td></tr>
       <tr><td class="sm">&nbsp;Precio/4 horas: S/.${(d.checkin.precio_noche||0).toFixed(2)}</td><td></td></tr>
     </table>
     ${consumosHTML}
@@ -1050,17 +1062,22 @@ async function toggleProduct(id,estado){await sb.from('productos').update({activ
 //  CAJAS — con histórico por fecha y ticket de cierre
 // ══════════════════════════════════════════════════════════
 async function loadCajas(){
-  const hoy=new Date().toISOString().split('T')[0];
-  // Inicializar filtro de fecha si no tiene valor
+  const hoy=fechaPeruHoy(); // siempre UTC-5 Perú — evita bug nocturno
+  // Input fecha: sin restricciones min/max (permite fechas anteriores)
   const fecInput=document.getElementById('caja-hist-fecha');
-  if(fecInput&&!fecInput.value) fecInput.value=hoy;
+  if(fecInput){
+    fecInput.removeAttribute('min');
+    fecInput.removeAttribute('max');
+    if(!fecInput.value) fecInput.value=hoy;
+  }
   const fechaFiltro=fecInput?.value||hoy;
   document.getElementById('caja-fecha').textContent=fechaFiltro;
 
   const { data:cajas } = await sb.from('cajas').select('*, usuarios(nombre)').eq('fecha',fechaFiltro).order('created_at');
 
-  // Actualizar cajaActual si es hoy
-  if(fechaFiltro===hoy) cajaActual=cajas?.find(c=>c.usuario_id===currentUserProfile?.id&&c.estado==='abierta')||cajaActual||null;
+  // Comparar siempre contra fechaPeruHoy() en tiempo real
+  const esHoy = fechaFiltro === fechaPeruHoy();
+  if(esHoy) cajaActual=cajas?.find(c=>c.usuario_id===currentUserProfile?.id&&c.estado==='abierta')||cajaActual||null;
 
   const grid=document.getElementById('cajas-grid');
   grid.innerHTML=cajas?.length
@@ -1071,7 +1088,7 @@ async function loadCajas(){
           <div class="caja-total">S/. ${(c.total||0).toFixed(2)}</div>
           <div class="caja-sub">Apertura: ${formatTime(c.created_at)}</div>
           <div class="caja-actions">
-            ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id&&fechaFiltro===hoy
+            ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id&&fechaFiltro===fechaPeruHoy()
               ?`<button class="sys-btn sys-btn-outline sys-btn-sm" onclick="cerrarCaja(${c.id})">Cerrar caja</button>`:''}
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="verDetalleCaja(${c.id})">Ver detalle</button>
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="imprimirCaja(${c.id})">🖨 Ticket</button>
@@ -1086,7 +1103,7 @@ async function loadCajas(){
   if(fecInput&&!fecInput._bound){fecInput._bound=true;fecInput.addEventListener('change',loadCajas);}
 
   // Mostrar movimientos de la caja activa del usuario para HOY
-  if(cajaActual&&fechaFiltro===hoy){
+  if(cajaActual&&fechaFiltro===fechaPeruHoy()){
     const { data:movs } = await sb.from('movimientos_caja').select('*').eq('caja_id',cajaActual.id).order('created_at',{ascending:false});
     const tbody=document.getElementById('caja-movimientos');
     tbody.innerHTML=movs?.length
@@ -1256,7 +1273,7 @@ async function filtrarComprobantes(){
         <td><strong>S/. ${c.total?.toFixed(2)}</strong></td>
         <td style="white-space:nowrap">
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="reimprimirComp(${c.id})">🖨 Reimprimir</button>
-            ${currentUserProfile?.rol==='admin'?`<button class="sys-btn sys-btn-outline sys-btn-sm" style="margin-left:4px" onclick="editarMetodoPago(${c.id})">✏️ Pago</button>`:''}
+            <button class="sys-btn sys-btn-outline sys-btn-sm" style="margin-left:4px" onclick="editarMetodoPago(${c.id})">✏️ Pago</button>
           </td>
       </tr>`).join('')
     :'<tr><td colspan="7" class="empty-row">No hay comprobantes en este rango</td></tr>';
@@ -1573,7 +1590,7 @@ document.addEventListener('click',e=>{
 //  EDITAR MÉTODO DE PAGO COMPROBANTE (solo admin)
 // ══════════════════════════════════════════════════════════
 async function editarMetodoPago(id){
-  if(currentUserProfile?.rol!=='admin'){showToast('Solo el administrador puede editar comprobantes','err');return;}
+  // Todos los roles pueden corregir el método de pago
   const { data:comp } = await sb.from('comprobantes').select('serie,metodo_pago').eq('id',id).single();
   if(!comp) return;
   document.getElementById('edit-comp-id').value=id;
