@@ -461,7 +461,6 @@ async function confirmarCheckin(habId) {
 // ── CHECK-OUT ──────────────────────────────────────────────
 async function openCheckoutModal(room, checkin) {
   if(!requireCaja('hacer check-out')) return;
-<<<<<<< HEAD
   document.getElementById('co-hab-num').textContent = String(room.numero).padStart(3,'0');
 
   // Precio FIJO — se cobra una vez independiente de las horas
@@ -501,37 +500,6 @@ async function openCheckoutModal(room, checkin) {
     <div class="checkout-row checkout-total">
       <span>TOTAL A COBRAR</span><span id="co-total-display">S/. ${totalBase.toFixed(2)}</span>
     </div>
-=======
-  document.getElementById('co-hab-num').textContent=String(room.numero).padStart(3,'0');
-
-  // Precio FIJO de la habitación (se paga 1 sola vez, independiente de las horas)
-  const totalHab = checkin.precio_noche || 0;
-
-  const { data:consumos } = await sb.from('consumos_habitacion')
-    .select('*, productos(nombre)').eq('check_in_id',checkin.id).is('cobrado',false);
-  const totalConsumos=consumos?.reduce((s,c)=>s+(c.precio_total||0),0)||0;
-  const totalBase = totalHab + totalConsumos; // sin sanción todavía
-
-  // Calcular tiempo transcurrido para mostrar info
-  const ciTS = checkin.created_at || (checkin.check_in_fecha + 'T00:00:00');
-  const horasUsadas = (Date.now() - new Date(ciTS).getTime()) / 3600000;
-  const excedido = horasUsadas > 4;
-  const excesoHoras = excedido ? (horasUsadas - 4).toFixed(1) : 0;
-
-  const summary=document.getElementById('checkout-summary');
-  summary.innerHTML=`
-    <div class="checkout-row"><span>Huésped</span><span>${checkin.nombre_huesped}</span></div>
-    <div class="checkout-row"><span>Tiempo usado</span><span>${horasUsadas.toFixed(1)}h de 4h${excedido?` <span style="color:var(--danger);font-weight:700">(+${excesoHoras}h extra)</span>`:''}</span></div>
-    <div class="checkout-row"><span>Precio habitación</span><span>S/. ${totalHab.toFixed(2)}</span></div>
-    ${consumos?.map(c=>`<div class="checkout-row"><span>&nbsp;• ${c.productos?.nombre} x${c.cantidad}</span><span>S/. ${c.precio_total?.toFixed(2)}</span></div>`).join('')||''}
-    ${totalConsumos>0?`<div class="checkout-row"><span>Consumos extras</span><span>S/. ${totalConsumos.toFixed(2)}</span></div>`:''}
-    ${excedido?`
-    <div class="checkout-row" style="background:var(--warning-light);border-radius:6px;padding:8px;">
-      <span style="color:var(--warning);font-weight:600">⚠️ Sanción por tiempo extra</span>
-      <span><input type="number" id="monto-sancion" class="sys-input" placeholder="0.00" step="0.01" min="0" style="width:90px;text-align:right" oninput="recalcularTotal()"> S/.</span>
-    </div>`:''}
-    <div class="checkout-row checkout-total" id="row-total"><span>TOTAL A COBRAR</span><span id="total-cobrar-display">S/. ${totalBase.toFixed(2)}</span></div>
->>>>>>> 6af7978bf0dd22ac08738fa7b62608b779445ca5
     <div class="pago-section">
       <div class="form-field"><label>Método de pago</label>
         <div class="metodo-pago-grid">
@@ -543,18 +511,13 @@ async function openCheckoutModal(room, checkin) {
       </div>
       <div id="efectivo-section" class="efectivo-section">
         <div class="form-field"><label>Efectivo recibido (S/.)</label>
-<<<<<<< HEAD
           <input type="number" id="efectivo-recibido" class="sys-input" step="0.01"
             value="${totalBase.toFixed(2)}">
-=======
-          <input type="number" id="efectivo-recibido" class="sys-input" step="0.01" value="${totalBase.toFixed(2)}">
->>>>>>> 6af7978bf0dd22ac08738fa7b62608b779445ca5
         </div>
         <div class="vuelto-display">Vuelto: <strong id="vuelto-display">S/. 0.00</strong></div>
       </div>
     </div>`;
 
-<<<<<<< HEAD
   // Recalcular total cuando cambia la sanción
   window._coBase = totalBase;
   window._coMetodo = 'Efectivo';
@@ -572,32 +535,10 @@ async function openCheckoutModal(room, checkin) {
       btn.classList.add('active');
       window._coMetodo = btn.dataset.metodo;
       document.getElementById('efectivo-section').style.display = btn.dataset.metodo==='Efectivo'?'block':'none';
-=======
-  // Guardar datos base en variable global
-  window._checkoutData={room,checkin,totalBase,consumos,totalHab,totalConsumos,horasUsadas,excedido,metodoPago:'Efectivo'};
-
-  // Recalcular total cuando cambia la sanción
-  window.recalcularTotal = function() {
-    const sancion = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
-    const nuevoTotal = totalBase + sancion;
-    document.getElementById('total-cobrar-display').textContent = `S/. ${nuevoTotal.toFixed(2)}`;
-    document.getElementById('efectivo-recibido').value = nuevoTotal.toFixed(2);
-    window._checkoutData.sancion = sancion;
-  };
-
-  let metodoPago='Efectivo';
-  summary.querySelectorAll('.metodo-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      summary.querySelectorAll('.metodo-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active'); metodoPago=btn.dataset.metodo;
-      window._checkoutData.metodoPago=metodoPago;
-      document.getElementById('efectivo-section').style.display=metodoPago==='Efectivo'?'block':'none';
->>>>>>> 6af7978bf0dd22ac08738fa7b62608b779445ca5
     });
   });
 
   document.getElementById('efectivo-recibido')?.addEventListener('input',e=>{
-<<<<<<< HEAD
     const san = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
     const tot = window._coBase + san;
     const v = Math.max(0, parseFloat(e.target.value||0)-tot);
@@ -613,28 +554,10 @@ async function openCheckoutModal(room, checkin) {
     const rec  = parseFloat(document.getElementById('efectivo-recibido')?.value)||tot;
     const vuel = metP==='Efectivo' ? Math.max(0,rec-tot) : 0;
     await confirmarCheckout(room, checkin, tot, consumos, metP, vuel, totalHab, totalConsumos, san);
-=======
-    const sancion = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
-    const totalFinal = totalBase + sancion;
-    const v=Math.max(0,parseFloat(e.target.value||0)-totalFinal);
-    const vd=document.getElementById('vuelto-display');
-    vd.textContent=`S/. ${v.toFixed(2)}`; vd.style.color=v>0?'var(--primary)':'var(--text-2)';
-  });
-
-  document.getElementById('btn-confirmar-checkout').onclick=async()=>{
-    const d = window._checkoutData;
-    const metP = d.metodoPago||'Efectivo';
-    const sancion = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
-    const totalFinal = totalBase + sancion;
-    const recibido = parseFloat(document.getElementById('efectivo-recibido')?.value)||totalFinal;
-    const vuelto = metP==='Efectivo' ? Math.max(0,recibido-totalFinal) : 0;
-    await confirmarCheckout(room,checkin,totalFinal,consumos,metP,vuelto,totalHab,totalConsumos,sancion);
->>>>>>> 6af7978bf0dd22ac08738fa7b62608b779445ca5
   };
 
   openModal('modal-checkout');
 }
-<<<<<<< HEAD
 
 // Las penalizaciones ya se manejan dentro del modal — estas funciones siguen existiendo
 // por si el modal de penalizacion externo se llama desde otro lugar
@@ -708,30 +631,6 @@ async function confirmarCheckout(room, checkin, total, consumos, metodoPago, vue
     console.error('Error en checkout:', err);
     showToast('Error al procesar: ' + (err.message||'ver consola'), 'err');
   }
-=======
-// continuarCheckout* ya no se usan - la sanción se maneja inline en openCheckoutModal
-async function continuarCheckoutSinPen(){
-  closeModal('modal-penalizacion');
-}
-async function continuarCheckoutConPen(){
-  closeModal('modal-penalizacion');
-}
-
-async function confirmarCheckout(room,checkin,total,consumos,metodoPago,vuelto,totalHab,totalConsumos,penalizacion=0) {
-  await sb.from('check_ins').update({check_out_real:new Date().toISOString(),total_cobrado:total,metodo_pago:metodoPago}).eq('id',checkin.id);
-  await sb.from('habitaciones').update({estado:'limpieza'}).eq('id',room.id);
-  if(consumos?.length) await sb.from('consumos_habitacion').update({cobrado:true}).in('id',consumos.map(c=>c.id));
-  await sb.from('movimientos_caja').insert({
-    caja_id:cajaActual.id,concepto:`Check-out Hab.${String(room.numero).padStart(3,'0')} (${metodoPago})`,
-    tipo:'ingreso',monto:total,usuario_id:currentUserProfile?.id,
-  });
-  const serie=await getSiguienteSerie('HAB');
-  const datosTicket={serie,room,checkin,consumos,total,metodoPago,vuelto,noches,totalHab,totalConsumos,cajero:currentUserProfile?.nombre||'—',fecha:new Date().toISOString()};
-  await registrarComprobante({serie,tipo:'HAB',descripcion:`Hab.${String(room.numero).padStart(3,'0')} — ${room.categoria} — ${noches} noche(s)`,cliente:checkin.nombre_huesped,total,metodo_pago:metodoPago,datos_json:datosTicket,check_in_id:checkin.id});
-  imprimirTicketHabitacion(datosTicket);
-  showToast('🚪 Check-out completado','ok');
-  closeModal('modal-checkout'); loadHabitaciones();
->>>>>>> 6af7978bf0dd22ac08738fa7b62608b779445ca5
 }
 
 //  TICKETS IMPRESIÓN TÉRMICA 80mm
@@ -797,11 +696,7 @@ function imprimirTicketHabitacion(d) {
     <div class="ln"></div>
     <table>
       <tr><td>Habitación (tarifa fija)</td><td class="r">S/.${d.totalHab.toFixed(2)}</td></tr>
-<<<<<<< HEAD
       ${(d.penalizacion||0)>0?`<tr><td>Sanción por tiempo extra</td><td class="r">S/.${(d.penalizacion||0).toFixed(2)}</td></tr>`:''}
-=======
-      <tr><td class="sm">&nbsp;Precio/4 horas: S/.${(d.checkin.precio_noche||0).toFixed(2)}</td><td></td></tr>
->>>>>>> 6af7978bf0dd22ac08738fa7b62608b779445ca5
     </table>
     ${consumosHTML}
     <div class="ln"></div>
@@ -1230,22 +1125,17 @@ async function toggleProduct(id,estado){await sb.from('productos').update({activ
 //  CAJAS — con histórico por fecha y ticket de cierre
 // ══════════════════════════════════════════════════════════
 async function loadCajas(){
-  const hoy=fechaPeruHoy(); // siempre UTC-5 Perú — evita bug nocturno
-  // Input fecha: sin restricciones min/max (permite fechas anteriores)
+  const hoy=new Date().toISOString().split('T')[0];
+  // Inicializar filtro de fecha si no tiene valor
   const fecInput=document.getElementById('caja-hist-fecha');
-  if(fecInput){
-    fecInput.removeAttribute('min');
-    fecInput.removeAttribute('max');
-    if(!fecInput.value) fecInput.value=hoy;
-  }
+  if(fecInput&&!fecInput.value) fecInput.value=hoy;
   const fechaFiltro=fecInput?.value||hoy;
   document.getElementById('caja-fecha').textContent=fechaFiltro;
 
   const { data:cajas } = await sb.from('cajas').select('*, usuarios(nombre)').eq('fecha',fechaFiltro).order('created_at');
 
-  // Comparar siempre contra fechaPeruHoy() en tiempo real
-  const esHoy = fechaFiltro === fechaPeruHoy();
-  if(esHoy) cajaActual=cajas?.find(c=>c.usuario_id===currentUserProfile?.id&&c.estado==='abierta')||cajaActual||null;
+  // Actualizar cajaActual si es hoy
+  if(fechaFiltro===hoy) cajaActual=cajas?.find(c=>c.usuario_id===currentUserProfile?.id&&c.estado==='abierta')||cajaActual||null;
 
   const grid=document.getElementById('cajas-grid');
   grid.innerHTML=cajas?.length
@@ -1256,7 +1146,7 @@ async function loadCajas(){
           <div class="caja-total">S/. ${(c.total||0).toFixed(2)}</div>
           <div class="caja-sub">Apertura: ${formatTime(c.created_at)}</div>
           <div class="caja-actions">
-            ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id&&fechaFiltro===fechaPeruHoy()
+            ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id&&fechaFiltro===hoy
               ?`<button class="sys-btn sys-btn-outline sys-btn-sm" onclick="cerrarCaja(${c.id})">Cerrar caja</button>`:''}
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="verDetalleCaja(${c.id})">Ver detalle</button>
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="imprimirCaja(${c.id})">🖨 Ticket</button>
@@ -1271,7 +1161,7 @@ async function loadCajas(){
   if(fecInput&&!fecInput._bound){fecInput._bound=true;fecInput.addEventListener('change',loadCajas);}
 
   // Mostrar movimientos de la caja activa del usuario para HOY
-  if(cajaActual&&fechaFiltro===fechaPeruHoy()){
+  if(cajaActual&&fechaFiltro===hoy){
     const { data:movs } = await sb.from('movimientos_caja').select('*').eq('caja_id',cajaActual.id).order('created_at',{ascending:false});
     const tbody=document.getElementById('caja-movimientos');
     tbody.innerHTML=movs?.length
@@ -1512,7 +1402,7 @@ async function filtrarComprobantes(){
         <td><strong>S/. ${c.total?.toFixed(2)}</strong></td>
         <td style="white-space:nowrap">
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="reimprimirComp(${c.id})">🖨 Reimprimir</button>
-            <button class="sys-btn sys-btn-outline sys-btn-sm" style="margin-left:4px" onclick="editarMetodoPago(${c.id})">✏️ Pago</button>
+            ${currentUserProfile?.rol==='admin'?`<button class="sys-btn sys-btn-outline sys-btn-sm" style="margin-left:4px" onclick="editarMetodoPago(${c.id})">✏️ Pago</button>`:''}
           </td>
       </tr>`).join('')
     :'<tr><td colspan="7" class="empty-row">No hay comprobantes en este rango</td></tr>';
@@ -1829,7 +1719,7 @@ document.addEventListener('click',e=>{
 //  EDITAR MÉTODO DE PAGO COMPROBANTE (solo admin)
 // ══════════════════════════════════════════════════════════
 async function editarMetodoPago(id){
-  // Todos los roles pueden corregir el método de pago
+  if(currentUserProfile?.rol!=='admin'){showToast('Solo el administrador puede editar comprobantes','err');return;}
   const { data:comp } = await sb.from('comprobantes').select('serie,metodo_pago').eq('id',id).single();
   if(!comp) return;
   document.getElementById('edit-comp-id').value=id;
