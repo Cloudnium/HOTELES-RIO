@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS habitaciones (
   id            BIGSERIAL PRIMARY KEY,
   numero        INTEGER NOT NULL UNIQUE,
   piso          INTEGER NOT NULL DEFAULT 1,
-  categoria     TEXT NOT NULL DEFAULT 'individual'
-                CHECK (categoria IN ('individual','doble','matrimonial','suite')),
+  categoria     TEXT NOT NULL
+                CHECK (categoria IN ('economico','premium','suite')),
   estado        TEXT NOT NULL DEFAULT 'disponible'
                 CHECK (estado IN ('disponible','ocupado','limpieza','mantenimiento','reservado')),
   precio_noche  NUMERIC(10,2) DEFAULT 0,
@@ -198,17 +198,27 @@ CREATE POLICY "auth_users_only" ON movimientos_caja FOR ALL TO authenticated USI
 -- ══════════════════════════════════════════════════════════════
 --  DATOS INICIALES: Habitaciones (ajusta según tu hotel)
 -- ══════════════════════════════════════════════════════════════
+-- ECONOMICO (001–008)
 INSERT INTO habitaciones (numero, piso, categoria, precio_noche) VALUES
-  (101, 1, 'individual',   80),
-  (102, 1, 'individual',   80),
-  (103, 1, 'doble',       120),
-  (104, 1, 'doble',       120),
-  (105, 1, 'matrimonial', 140),
-  (201, 2, 'individual',   80),
-  (202, 2, 'doble',       120),
-  (203, 2, 'matrimonial', 140),
-  (204, 2, 'suite',       220),
-  (301, 3, 'suite',       250)
+(1,1,'economico',50),(2,1,'economico',50),(3,1,'economico',50),
+(4,1,'economico',50),(5,1,'economico',50),(6,1,'economico',50),
+(7,1,'economico',50),(8,1,'economico',50)
+ON CONFLICT (numero) DO NOTHING;
+
+-- PREMIUM (201–216)
+INSERT INTO habitaciones (numero, piso, categoria, precio_noche) VALUES
+(201,2,'premium',120),(202,2,'premium',120),(203,2,'premium',120),
+(204,2,'premium',120),(205,2,'premium',120),(206,2,'premium',120),
+(207,2,'premium',120),(208,2,'premium',120),(209,2,'premium',120),
+(210,2,'premium',120),(211,2,'premium',120),(212,2,'premium',120),
+(213,2,'premium',120),(214,2,'premium',120),(215,2,'premium',120),
+(216,2,'premium',120)
+ON CONFLICT (numero) DO NOTHING;
+
+-- SUITE (217–220)
+INSERT INTO habitaciones (numero, piso, categoria, precio_noche) VALUES
+(217,2,'suite',250),(218,2,'suite',250),
+(219,2,'suite',250),(220,2,'suite',250)
 ON CONFLICT (numero) DO NOTHING;
 
 -- ══════════════════════════════════════════════════════════════
