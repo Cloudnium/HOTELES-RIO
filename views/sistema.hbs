@@ -76,6 +76,9 @@
         <a class="sys-nav-item" data-sec="cajas">
           <i class="fas fa-cash-register fa-fw"></i> Cajas del Día
         </a>
+        <a class="sys-nav-item" data-sec="egresos">
+          <i class="fas fa-arrow-circle-down fa-fw"></i> Egresos
+        </a>
         <a class="sys-nav-item" data-sec="reportes">
           <i class="fas fa-chart-bar fa-fw"></i> Reportes
         </a>
@@ -321,40 +324,131 @@
           </div>
         </section>
 
+        <!-- ═══ EGRESOS ═══ -->
+        <section id="sec-egresos" class="sys-section">
+          <div class="sec-toolbar">
+            <div class="sec-toolbar-left">
+              <input type="date" class="sys-input" id="egreso-filtro-fecha">
+              <select id="egreso-filtro-cat" class="sys-select">
+                <option value="">Todas las categorías</option>
+                <option value="compra">Compra de insumos</option>
+                <option value="servicio">Servicio / Pago terceros</option>
+                <option value="personal">Pago a personal</option>
+                <option value="mantenimiento">Mantenimiento</option>
+                <option value="otros">Otros gastos</option>
+              </select>
+            </div>
+            <button class="sys-btn sys-btn-gold" id="btn-nuevo-egreso">
+              <i class="fas fa-plus"></i> Nuevo egreso
+            </button>
+          </div>
+          <div class="stats-row-sys" id="egresos-stats"></div>
+          <div class="sys-card">
+            <div class="sys-card-head"><h3><i class="fas fa-arrow-down" style="color:var(--danger);margin-right:6px"></i>Registro de Egresos</h3></div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Fecha</th><th>Categoría</th><th>Proveedor / Descripción</th><th>N° Doc.</th><th>Tipo Doc.</th><th>Monto</th><th>Acciones</th></tr></thead>
+              <tbody id="egresos-table"><tr><td colspan="7" class="empty-row">Cargando...</td></tr></tbody>
+            </table></div>
+          </div>
+        </section>
+
         <!-- ═══ REPORTES — Auto por fecha ═══ -->
         <section id="sec-reportes" class="sys-section">
-          <div class="sec-toolbar">
+          <!-- Filtro de fechas -->
+          <div class="rep-fecha-bar">
             <div class="date-filter-group">
               <label>Desde</label>
               <input type="date" class="sys-input" id="reporte-desde">
               <label>Hasta</label>
               <input type="date" class="sys-input" id="reporte-hasta">
             </div>
+            <span id="rep-periodo-label" class="rep-periodo-label"></span>
           </div>
-          <div class="stats-row-sys" id="reporte-stats">
-            <div class="stat-card-sys"><p>Selecciona fechas</p><h3>—</h3></div>
+
+          <!-- Fila 1: KPIs de habitaciones -->
+          <div class="rep-kpi-grid" id="rep-kpi-habs">
+            <div class="rep-kpi-card rep-kpi-blue">
+              <div class="rep-kpi-body"><span class="rep-kpi-val" id="rep-tot-habs">—</span><span class="rep-kpi-lbl">Total habitaciones</span></div>
+              <i class="fas fa-building rep-kpi-icon"></i>
+            </div>
+            <div class="rep-kpi-card rep-kpi-green">
+              <div class="rep-kpi-body"><span class="rep-kpi-val" id="rep-disponibles">—</span><span class="rep-kpi-lbl">Disponibles</span></div>
+              <i class="fas fa-door-open rep-kpi-icon"></i>
+            </div>
+            <div class="rep-kpi-card rep-kpi-red">
+              <div class="rep-kpi-body"><span class="rep-kpi-val" id="rep-ocupadas">—</span><span class="rep-kpi-lbl">Ocupadas</span></div>
+              <i class="fas fa-door-closed rep-kpi-icon"></i>
+            </div>
+            <div class="rep-kpi-card rep-kpi-yellow">
+              <div class="rep-kpi-body"><span class="rep-kpi-val" id="rep-mant">—</span><span class="rep-kpi-lbl">En mantenimiento</span></div>
+              <i class="fas fa-tools rep-kpi-icon"></i>
+            </div>
+            <div class="rep-kpi-card rep-kpi-purple">
+              <div class="rep-kpi-body"><span class="rep-kpi-val" id="rep-reservas-hoy">—</span><span class="rep-kpi-lbl">Reservas del período</span></div>
+              <i class="fas fa-concierge-bell rep-kpi-icon"></i>
+            </div>
+            <div class="rep-kpi-card rep-kpi-gold">
+              <div class="rep-kpi-body"><span class="rep-kpi-val" id="rep-checkouts-periodo">—</span><span class="rep-kpi-lbl">Check-outs del período</span></div>
+              <i class="fas fa-folder-open rep-kpi-icon"></i>
+            </div>
           </div>
+
+          <!-- Fila 2: KPIs financieros -->
+          <div class="rep-financiero-grid">
+            <div class="rep-fin-card rep-fin-total">
+              <div class="rep-fin-icon"><i class="fas fa-money-bill-wave"></i></div>
+              <div><div class="rep-fin-label">TOTAL GENERAL</div><div class="rep-fin-val" id="rep-total-general">S/. 0.00</div></div>
+            </div>
+            <div class="rep-fin-card rep-fin-efectivo">
+              <div class="rep-fin-icon"><i class="fas fa-money-bill"></i></div>
+              <div><div class="rep-fin-label">EFECTIVO</div><div class="rep-fin-val" id="rep-efectivo">S/. 0.00</div><div class="rep-fin-sub">por método</div></div>
+            </div>
+            <div class="rep-fin-card rep-fin-digital">
+              <div class="rep-fin-icon"><i class="fas fa-credit-card"></i></div>
+              <div><div class="rep-fin-label">OTROS MÉTODOS</div><div class="rep-fin-val" id="rep-otros">S/. 0.00</div><div class="rep-fin-sub">Tarjeta / Yape / Plin</div></div>
+            </div>
+            <div class="rep-fin-card rep-fin-checkouts">
+              <div class="rep-fin-icon"><i class="fas fa-check-double"></i></div>
+              <div><div class="rep-fin-label">Check-outs completados</div><div class="rep-fin-val" id="rep-co-completados">0</div></div>
+            </div>
+            <div class="rep-fin-card rep-fin-tienda">
+              <div class="rep-fin-icon"><i class="fas fa-store"></i></div>
+              <div><div class="rep-fin-label">Ventas tienda pública</div><div class="rep-fin-val" id="rep-ventas-count">0 VENTAS</div><div class="rep-fin-sub" id="rep-ventas-sub">S/. 0.00</div></div>
+            </div>
+            <div class="rep-fin-card rep-fin-egresos">
+              <div class="rep-fin-icon"><i class="fas fa-arrow-down"></i></div>
+              <div><div class="rep-fin-label">Egresos del período</div><div class="rep-fin-val" id="rep-egresos-val">S/. 0.00</div></div>
+            </div>
+          </div>
+
+          <!-- Fila 3: Tablas detalle -->
           <div class="two-col-layout">
             <div class="sys-card">
-              <div class="sys-card-head"><h3>Ingresos por Habitaciones + Consumos</h3></div>
+              <div class="sys-card-head">
+                <h3><i class="fas fa-bed" style="color:var(--primary);margin-right:6px"></i>Ingresos por Habitaciones + Consumos</h3>
+              </div>
               <div class="table-wrap"><table>
-                <thead><tr><th>Habitación</th><th>Noches</th><th>Total</th></tr></thead>
-                <tbody id="reporte-habitaciones"><tr><td colspan="3" class="empty-row">Selecciona un rango de fechas</td></tr></tbody>
+                <thead><tr><th>Habitación</th><th>Usos</th><th>Total</th></tr></thead>
+                <tbody id="reporte-habitaciones"><tr><td colspan="3" class="empty-row">Cargando...</td></tr></tbody>
               </table></div>
             </div>
             <div class="sys-card">
-              <div class="sys-card-head"><h3>Ingresos Tienda Pública</h3></div>
+              <div class="sys-card-head">
+                <h3><i class="fas fa-shopping-cart" style="color:var(--primary);margin-right:6px"></i>Ingresos Tienda Pública</h3>
+              </div>
               <div class="table-wrap"><table>
-                <thead><tr><th>Producto</th><th>Cantidad</th><th>Total</th></tr></thead>
-                <tbody id="reporte-ventas"><tr><td colspan="3" class="empty-row">Selecciona un rango de fechas</td></tr></tbody>
+                <thead><tr><th>Producto</th><th>Qty</th><th>Total</th></tr></thead>
+                <tbody id="reporte-ventas"><tr><td colspan="3" class="empty-row">Cargando...</td></tr></tbody>
               </table></div>
             </div>
           </div>
           <div class="sys-card">
-            <div class="sys-card-head"><h3>Detalle de Check-ins / Check-outs</h3></div>
+            <div class="sys-card-head">
+              <h3><i class="fas fa-list-alt" style="color:var(--primary);margin-right:6px"></i>Detalle de Check-outs del período</h3>
+            </div>
             <div class="table-wrap"><table>
-              <thead><tr><th>Serie</th><th>Hab.</th><th>Cliente</th><th>Check-in</th><th>Check-out</th><th>Noches</th><th>Hab.</th><th>Consumos</th><th>Pago</th><th>Total</th></tr></thead>
-              <tbody id="reporte-checkins"><tr><td colspan="10" class="empty-row">Selecciona un rango de fechas</td></tr></tbody>
+              <thead><tr><th>Serie</th><th>Hab.</th><th>Cliente</th><th>Check-in</th><th>Check-out</th><th>Hab.</th><th>Consumos</th><th>Sanción</th><th>Pago</th><th>Total</th></tr></thead>
+              <tbody id="reporte-checkins"><tr><td colspan="10" class="empty-row">Cargando...</td></tr></tbody>
             </table></div>
           </div>
         </section>
@@ -730,6 +824,52 @@
       <div class="form-actions">
         <button class="sys-btn sys-btn-outline" data-modal="modal-habitacion-edit">Cancelar</button>
         <button class="sys-btn sys-btn-gold" id="btn-guardar-habitacion">Guardar habitación</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal egreso -->
+<div id="modal-egreso" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head">
+      <h3 id="modal-egreso-title"><i class="fas fa-arrow-circle-down" style="color:var(--danger);margin-right:8px"></i>Registrar Egreso</h3>
+      <button class="modal-close" data-modal="modal-egreso">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <div class="form-grid-2">
+        <div class="form-field"><label>Fecha</label>
+          <input type="date" id="eg-fecha" class="sys-input"></div>
+        <div class="form-field"><label>Categoría</label>
+          <select id="eg-categoria" class="sys-select">
+            <option value="compra">Compra de insumos</option>
+            <option value="servicio">Servicio / Pago terceros</option>
+            <option value="personal">Pago a personal</option>
+            <option value="mantenimiento">Mantenimiento</option>
+            <option value="otros">Otros gastos</option>
+          </select></div>
+        <div class="form-field form-field-full"><label>Descripción / Concepto</label>
+          <input type="text" id="eg-descripcion" class="sys-input" placeholder="Ej: Compra de productos de limpieza"></div>
+        <div class="form-field"><label>Proveedor / A nombre de</label>
+          <input type="text" id="eg-proveedor" class="sys-input" placeholder="Ej: Distribuidora XYZ"></div>
+        <div class="form-field"><label>Monto (S/.)</label>
+          <input type="number" id="eg-monto" class="sys-input" placeholder="0.00" step="0.01" min="0"></div>
+        <div class="form-field"><label>Tipo de documento</label>
+          <select id="eg-tipo-doc" class="sys-select">
+            <option value="boleta">Boleta</option>
+            <option value="factura">Factura</option>
+            <option value="recibo">Recibo</option>
+            <option value="sin_doc">Sin documento</option>
+          </select></div>
+        <div class="form-field"><label>N° de documento</label>
+          <input type="text" id="eg-num-doc" class="sys-input" placeholder="Ej: B001-00123"></div>
+        <div class="form-field form-field-full"><label>Observaciones</label>
+          <textarea id="eg-obs" class="sys-input" rows="2" placeholder="Notas adicionales..."></textarea></div>
+        <input type="hidden" id="eg-id">
+      </div>
+      <div class="form-actions">
+        <button class="sys-btn sys-btn-outline" data-modal="modal-egreso">Cancelar</button>
+        <button class="sys-btn sys-btn-red" id="btn-guardar-egreso"><i class="fas fa-save"></i> Guardar egreso</button>
       </div>
     </div>
   </div>

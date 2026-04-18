@@ -197,7 +197,7 @@ function setupNavigation() {
 const sectionTitles = {
   habitaciones:'Habitaciones','reservas-web':'Reservas Web',
   'tienda-hab':'Tienda por Habitación','tienda-publica':'Tienda Pública',
-  almacen:'Almacén',cajas:'Cajas del Día',reportes:'Reportes',
+  almacen:'Almacén',cajas:'Cajas del Día',egresos:'Egresos',reportes:'Reportes',
   comprobantes:'Comprobantes',clientes:'Clientes',
   comentarios:'Comentarios Web',usuarios:'Usuarios'
 };
@@ -210,7 +210,7 @@ function loadSection(sec) {
   const loaders={
     habitaciones:loadHabitaciones,'reservas-web':loadReservasWeb,
     'tienda-hab':loadTiendaHab,'tienda-publica':loadTiendaPublica,
-    almacen:loadAlmacen,cajas:loadCajas,reportes:initReportes,
+    almacen:loadAlmacen,cajas:loadCajas,egresos:loadEgresos,reportes:initReportes,
     comprobantes:loadComprobantes,clientes:loadClientes,
     comentarios:loadComentarios,usuarios:loadUsuarios
   };
@@ -459,25 +459,47 @@ async function confirmarCheckin(habId) {
 }
 
 // ── CHECK-OUT ──────────────────────────────────────────────
-async function openCheckoutModal(room,checkin) {
+async function openCheckoutModal(room, checkin) {
   if(!requireCaja('hacer check-out')) return;
-  document.getElementById('co-hab-num').textContent=String(room.numero).padStart(3,'0');
-  const entrada=new Date(checkin.check_in_fecha),hoy=new Date();
-  const noches=Math.max(1,Math.ceil((hoy-entrada)/(1000*60*60*24)));
-  const totalHab=noches*(checkin.precio_noche||0);
+  document.getElementById('co-hab-num').textContent = String(room.numero).padStart(3,'0');
+
+  // Precio FIJO — se cobra una vez independiente de las horas
+  const totalHab = checkin.precio_noche || 0;
+
   const { data:consumos } = await sb.from('consumos_habitacion')
-    .select('*, productos(nombre)').eq('check_in_id',checkin.id).is('cobrado',false);
-  const totalConsumos=consumos?.reduce((s,c)=>s+(c.precio_total||0),0)||0;
-  const totalGeneral=totalHab+totalConsumos;
-  const summary=document.getElementById('checkout-summary');
-  summary.innerHTML=`
-    <div class="checkout-row"><span>Huésped</span><span>${checkin.nombre_huesped}</span></div>
-    <div class="checkout-row"><span>Noches</span><span>${noches}</span></div>
-    <div class="checkout-row"><span>Precio x noche</span><span>S/. ${(checkin.precio_noche||0).toFixed(2)}</span></div>
-    <div class="checkout-row"><span>Total habitación</span><span>S/. ${totalHab.toFixed(2)}</span></div>
-    ${consumos?.map(c=>`<div class="checkout-row"><span>&nbsp;• ${c.productos?.nombre} x${c.cantidad}</span><span>S/. ${c.precio_total?.toFixed(2)}</span></div>`).join('')||''}
-    <div class="checkout-row"><span>Consumos extras</span><span>S/. ${totalConsumos.toFixed(2)}</span></div>
-    <div class="checkout-row checkout-total"><span>TOTAL A COBRAR</span><span>S/. ${totalGeneral.toFixed(2)}</span></div>
+    .select('*, productos(nombre)').eq('check_in_id', checkin.id).is('cobrado', false);
+  const totalConsumos = consumos?.reduce((s,c)=>s+(c.precio_total||0),0) || 0;
+  const totalBase = totalHab + totalConsumos;
+
+  // Calcular tiempo transcurrido
+  const ciTS = checkin.created_at || (checkin.check_in_fecha + 'T00:00:00');
+  const horasUsadas = (Date.now() - new Date(ciTS).getTime()) / 3600000;
+  const excedido = horasUsadas > 4;
+
+  const summary = document.getElementById('checkout-summary');
+  summary.innerHTML = `
+    <div class="checkout-row"><span>Huésped</span><span><strong>${checkin.nombre_huesped}</strong></span></div>
+    <div class="checkout-row"><span>DNI</span><span>${checkin.dni_huesped||'—'}</span></div>
+    <div class="checkout-row"><span>Tiempo usado</span>
+      <span>${horasUsadas.toFixed(1)}h de 4h${excedido ? ` <span style="color:var(--danger);font-weight:700">(+${(horasUsadas-4).toFixed(1)}h extra)</span>` : ''}</span>
+    </div>
+    <div class="checkout-row"><span>Precio habitación</span><span>S/. ${totalHab.toFixed(2)}</span></div>
+    ${consumos?.map(c=>`<div class="checkout-row"><span>&nbsp;• ${c.productos?.nombre||'—'} x${c.cantidad}</span><span>S/. ${(c.precio_total||0).toFixed(2)}</span></div>`).join('')||''}
+    ${totalConsumos>0?`<div class="checkout-row"><span>Consumos extras</span><span>S/. ${totalConsumos.toFixed(2)}</span></div>`:''}
+    ${excedido?`
+    <div class="co-sancion-box">
+      <div style="color:var(--warning);font-weight:600;margin-bottom:6px">⚠️ Tiempo excedido — Sanción (opcional):</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px">S/.</span>
+        <input type="number" id="monto-sancion" class="sys-input" placeholder="0.00"
+          step="0.01" min="0" style="width:110px;text-align:right"
+          oninput="window._coRecalc()">
+        <span style="font-size:12px;color:var(--text-2)">ingresa 0 si no aplica</span>
+      </div>
+    </div>`:''}
+    <div class="checkout-row checkout-total">
+      <span>TOTAL A COBRAR</span><span id="co-total-display">S/. ${totalBase.toFixed(2)}</span>
+    </div>
     <div class="pago-section">
       <div class="form-field"><label>Método de pago</label>
         <div class="metodo-pago-grid">
@@ -489,79 +511,128 @@ async function openCheckoutModal(room,checkin) {
       </div>
       <div id="efectivo-section" class="efectivo-section">
         <div class="form-field"><label>Efectivo recibido (S/.)</label>
-          <input type="number" id="efectivo-recibido" class="sys-input" step="0.01" value="${totalGeneral.toFixed(2)}">
+          <input type="number" id="efectivo-recibido" class="sys-input" step="0.01"
+            value="${totalBase.toFixed(2)}">
         </div>
         <div class="vuelto-display">Vuelto: <strong id="vuelto-display">S/. 0.00</strong></div>
       </div>
     </div>`;
-  let metodoPago='Efectivo';
+
+  // Recalcular total cuando cambia la sanción
+  window._coBase = totalBase;
+  window._coMetodo = 'Efectivo';
+  window._coRecalc = function() {
+    const san = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
+    const nv = window._coBase + san;
+    document.getElementById('co-total-display').textContent = `S/. ${nv.toFixed(2)}`;
+    document.getElementById('efectivo-recibido').value = nv.toFixed(2);
+    document.getElementById('vuelto-display').textContent = 'S/. 0.00';
+  };
+
   summary.querySelectorAll('.metodo-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
       summary.querySelectorAll('.metodo-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active'); metodoPago=btn.dataset.metodo;
-      document.getElementById('efectivo-section').style.display=metodoPago==='Efectivo'?'block':'none';
+      btn.classList.add('active');
+      window._coMetodo = btn.dataset.metodo;
+      document.getElementById('efectivo-section').style.display = btn.dataset.metodo==='Efectivo'?'block':'none';
     });
   });
+
   document.getElementById('efectivo-recibido')?.addEventListener('input',e=>{
-    const v=Math.max(0,parseFloat(e.target.value||0)-totalGeneral);
-    const vd=document.getElementById('vuelto-display');
-    vd.textContent=`S/. ${v.toFixed(2)}`; vd.style.color=v>0?'var(--gold)':'var(--text-mid)';
+    const san = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
+    const tot = window._coBase + san;
+    const v = Math.max(0, parseFloat(e.target.value||0)-tot);
+    const vd = document.getElementById('vuelto-display');
+    vd.textContent=`S/. ${v.toFixed(2)}`; vd.style.color=v>0?'var(--primary)':'var(--text-2)';
   });
-  window._checkoutData={room,checkin,totalGeneral,consumos,totalHab,totalConsumos,noches,metodoPago:'Efectivo'};
-  document.getElementById('btn-confirmar-checkout').onclick=async()=>{
-    const metP=window._checkoutData.metodoPago||'Efectivo';
-    const recibido=parseFloat(document.getElementById('efectivo-recibido')?.value)||totalGeneral;
-    const vuelto=metP==='Efectivo'?Math.max(0,recibido-totalGeneral):0;
-    window._checkoutData.vuelto=vuelto; window._checkoutData.metodoPago=metP;
-    // Check 4h limit
-    const ciTS=checkin.created_at||checkin.check_in_fecha+'T12:00:00';
-    const horasUsadas=(new Date()-new Date(ciTS))/3600000;
-    if(horasUsadas>4){
-      closeModal('modal-checkout');
-      const exceso=Math.max(0,horasUsadas-4).toFixed(1);
-      document.getElementById('penalizacion-info').innerHTML=
-        `⚠️ El huésped usó <strong>${horasUsadas.toFixed(1)} horas</strong> (límite 4h). Exceso: <strong>${exceso}h</strong>.`;
-      document.getElementById('penalizacion-monto').value='';
-      openModal('modal-penalizacion');
-    } else {
-      await confirmarCheckout(room,checkin,totalGeneral,consumos,metP,vuelto,noches,totalHab,totalConsumos,0);
-    }
+
+  // Confirmar checkout
+  document.getElementById('btn-confirmar-checkout').onclick = async() => {
+    const metP = window._coMetodo || 'Efectivo';
+    const san  = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
+    const tot  = window._coBase + san;
+    const rec  = parseFloat(document.getElementById('efectivo-recibido')?.value)||tot;
+    const vuel = metP==='Efectivo' ? Math.max(0,rec-tot) : 0;
+    await confirmarCheckout(room, checkin, tot, consumos, metP, vuel, totalHab, totalConsumos, san);
   };
-  // Track metodo in realtime
-  document.getElementById('checkout-summary')?.querySelectorAll('.metodo-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{window._checkoutData.metodoPago=btn.dataset.metodo||'Efectivo';});
-  });
+
   openModal('modal-checkout');
 }
+
+// Las penalizaciones ya se manejan dentro del modal — estas funciones siguen existiendo
+// por si el modal de penalizacion externo se llama desde otro lugar
 async function continuarCheckoutSinPen(){
   closeModal('modal-penalizacion');
   const d=window._checkoutData;
-  await confirmarCheckout(d.room,d.checkin,d.totalGeneral,d.consumos,d.metodoPago,d.vuelto||0,d.noches,d.totalHab,d.totalConsumos,0);
+  if(d) await confirmarCheckout(d.room,d.checkin,d.totalBase,d.consumos,window._coMetodo||'Efectivo',0,d.totalHab,d.totalConsumos,0);
 }
 async function continuarCheckoutConPen(){
-  const pen=parseFloat(document.getElementById('penalizacion-monto').value)||0;
+  const pen=parseFloat(document.getElementById('penalizacion-monto')?.value)||0;
   closeModal('modal-penalizacion');
   const d=window._checkoutData;
-  await confirmarCheckout(d.room,d.checkin,d.totalGeneral+pen,d.consumos,d.metodoPago,d.vuelto||0,d.noches,d.totalHab,d.totalConsumos,pen);
+  if(d) await confirmarCheckout(d.room,d.checkin,d.totalBase+pen,d.consumos,window._coMetodo||'Efectivo',0,d.totalHab,d.totalConsumos,pen);
 }
 
-async function confirmarCheckout(room,checkin,total,consumos,metodoPago,vuelto,noches,totalHab,totalConsumos,penalizacion=0) {
-  await sb.from('check_ins').update({check_out_real:new Date().toISOString(),total_cobrado:total,metodo_pago:metodoPago}).eq('id',checkin.id);
-  await sb.from('habitaciones').update({estado:'limpieza'}).eq('id',room.id);
-  if(consumos?.length) await sb.from('consumos_habitacion').update({cobrado:true}).in('id',consumos.map(c=>c.id));
-  await sb.from('movimientos_caja').insert({
-    caja_id:cajaActual.id,concepto:`Check-out Hab.${String(room.numero).padStart(3,'0')} (${metodoPago})`,
-    tipo:'ingreso',monto:total,usuario_id:currentUserProfile?.id,
-  });
-  const serie=await getSiguienteSerie('HAB');
-  const datosTicket={serie,room,checkin,consumos,total,metodoPago,vuelto,noches,totalHab,totalConsumos,cajero:currentUserProfile?.nombre||'—',fecha:new Date().toISOString()};
-  await registrarComprobante({serie,tipo:'HAB',descripcion:`Hab.${String(room.numero).padStart(3,'0')} — ${room.categoria} — ${noches} noche(s)`,cliente:checkin.nombre_huesped,total,metodo_pago:metodoPago,datos_json:datosTicket,check_in_id:checkin.id});
-  imprimirTicketHabitacion(datosTicket);
-  showToast('🚪 Check-out completado','ok');
-  closeModal('modal-checkout'); loadHabitaciones();
+async function confirmarCheckout(room, checkin, total, consumos, metodoPago, vuelto, totalHab, totalConsumos, penalizacion=0) {
+  try {
+    // 1. Cerrar modal PRIMERO para que el usuario vea que algo pasó
+    closeModal('modal-checkout');
+    showToast('Procesando check-out...','ok');
+
+    // 2. Actualizar BD
+    await sb.from('check_ins').update({
+      check_out_real: new Date().toISOString(),
+      total_cobrado: total,
+      metodo_pago: metodoPago
+    }).eq('id', checkin.id);
+
+    await sb.from('habitaciones').update({estado:'limpieza'}).eq('id', room.id);
+
+    if(consumos?.length)
+      await sb.from('consumos_habitacion').update({cobrado:true}).in('id',consumos.map(c=>c.id));
+
+    if(cajaActual?.id) {
+      await sb.from('movimientos_caja').insert({
+        caja_id: cajaActual.id,
+        concepto: `Check-out Hab.${String(room.numero).padStart(3,'0')} (${metodoPago})` +
+                  (penalizacion>0?` | Sanción S/.${penalizacion.toFixed(2)}`:''),
+        tipo: 'ingreso',
+        monto: total,
+        usuario_id: currentUserProfile?.id,
+      });
+    }
+
+    // 3. Generar serie y comprobante
+    const serie = await getSiguienteSerie('HAB');
+    const datosTicket = {
+      serie, room, checkin, consumos, total, metodoPago, vuelto,
+      totalHab, totalConsumos, penalizacion,
+      cajero: currentUserProfile?.nombre||'—',
+      fecha:  new Date().toISOString()
+    };
+
+    await registrarComprobante({
+      serie, tipo:'HAB',
+      descripcion: `Hab.${String(room.numero).padStart(3,'0')} — ${CATEGORIA_LABELS[room.categoria]||room.categoria}`,
+      cliente: checkin.nombre_huesped,
+      total, metodo_pago: metodoPago,
+      datos_json: datosTicket,
+      check_in_id: checkin.id
+    });
+
+    // 4. Recargar habitaciones
+    loadHabitaciones();
+    showToast('🚪 Check-out completado','ok');
+
+    // 5. Abrir ticket (después de un breve delay para no bloquear UI)
+    setTimeout(() => imprimirTicketHabitacion(datosTicket), 400);
+
+  } catch(err) {
+    console.error('Error en checkout:', err);
+    showToast('Error al procesar: ' + (err.message||'ver consola'), 'err');
+  }
 }
 
-// ══════════════════════════════════════════════════════════
 //  TICKETS IMPRESIÓN TÉRMICA 80mm
 // ══════════════════════════════════════════════════════════
 function abrirVentanaTicket(html) {
@@ -624,8 +695,8 @@ function imprimirTicketHabitacion(d) {
     <div><span class="b">DNI:</span> ${d.checkin.dni_huesped||'—'}</div>
     <div class="ln"></div>
     <table>
-      <tr><td>Hab. — ${d.noches} noche(s)</td><td class="r">S/.${d.totalHab.toFixed(2)}</td></tr>
-      <tr><td class="sm">&nbsp;Precio/4 horas: S/.${(d.checkin.precio_noche||0).toFixed(2)}</td><td></td></tr>
+      <tr><td>Habitación (tarifa fija)</td><td class="r">S/.${d.totalHab.toFixed(2)}</td></tr>
+      ${(d.penalizacion||0)>0?`<tr><td>Sanción por tiempo extra</td><td class="r">S/.${(d.penalizacion||0).toFixed(2)}</td></tr>`:''}
     </table>
     ${consumosHTML}
     <div class="ln"></div>
@@ -696,7 +767,11 @@ function imprimirTicketCaja(d) {
     <div class="b sm">INGRESOS POR MÉTODO DE PAGO:</div>
     <table>${filasMetodos}</table>
     <div class="ln"></div>
-    <table><tr class="tr-total"><td class="b">TOTAL CAJA:</td><td class="r b">S/. ${d.totalGeneral.toFixed(2)}</td></tr></table>
+    <table>
+      <tr class="tr-total"><td class="b">TOTAL INGRESOS:</td><td class="r b">S/. ${d.totalGeneral.toFixed(2)}</td></tr>
+      ${d.totalEgresos>0?`<tr><td style="color:#dc2626">(-) Egresos del día:</td><td class="r" style="color:#dc2626">S/. ${d.totalEgresos.toFixed(2)}</td></tr>`:''}
+      ${d.totalEgresos>0?`<tr class="tr-total"><td class="b">NETO:</td><td class="r b">S/. ${(d.totalGeneral-d.totalEgresos).toFixed(2)}</td></tr>`:''}
+    </table>
     <div class="ln"></div>
     <div class="b sm">DETALLE DE MOVIMIENTOS (${d.movimientos.length}):</div>
     <table>${filasMov}</table>
@@ -1121,10 +1196,13 @@ async function imprimirCaja(cajaId){
   });
 
   const serie=await getSiguienteSerie('CAJA');
+  // Cargar egresos del día para incluir en el ticket
+  const { data:egresosTicket } = await sb.from('egresos').select('monto').eq('fecha',caja?.fecha||fechaPeruHoy()).catch(()=>({data:[]}));
+  const totalEgresos = (egresosTicket||[]).reduce((s,e)=>s+(e.monto||0),0);
   const datosTicket={
     serie, caja:`#${cajaId}`, usuario:caja?.usuarios?.nombre||'—',
     fecha:caja?.fecha, estado:caja?.estado,
-    movimientos:movs||[], resumenMetodos, totalGeneral:caja?.total||0
+    movimientos:movs||[], resumenMetodos, totalGeneral:caja?.total||0, totalEgresos
   };
   await registrarComprobante({serie,tipo:'CAJA',descripcion:`Resumen caja #${cajaId}`,cliente:'—',total:caja?.total||0,metodo_pago:'Varios',datos_json:datosTicket});
   imprimirTicketCaja(datosTicket);
@@ -1158,61 +1236,129 @@ function initReportes(){
   generarReporte();
 }
 async function generarReporte(){
-  const desde=document.getElementById('reporte-desde').value;
-  const hasta=document.getElementById('reporte-hasta').value;
-  if(!desde||!hasta){showToast('Selecciona el rango de fechas','err');return;}
-  const desdeTS=desde+'T00:00:00',hastaTS=hasta+'T23:59:59';
-  const { data:checkins } = await sb.from('check_ins').select('*, habitaciones(numero,categoria), clientes(nombre)').gte('check_in_fecha',desde).lte('check_in_fecha',hasta).order('check_in_fecha',{ascending:false});
-  const { data:consumosHab } = await sb.from('consumos_habitacion').select('*, productos(nombre)').gte('created_at',desdeTS).lte('created_at',hastaTS);
-  const { data:ventasPub } = await sb.from('ventas_publicas').select('*').gte('created_at',desdeTS).lte('created_at',hastaTS).order('created_at',{ascending:false});
-  const totalHabTotal=checkins?.reduce((s,c)=>s+(c.total_cobrado||0),0)||0;
-  const totalVentasPub=ventasPub?.reduce((s,v)=>s+(v.total||0),0)||0;
+  const desde = document.getElementById('reporte-desde').value;
+  const hasta  = document.getElementById('reporte-hasta').value;
+  if(!desde||!hasta){ showToast('Selecciona el rango de fechas','err'); return; }
+  const desdeTS = desde+'T00:00:00';
+  const hastaTS  = hasta+'T23:59:59';
+
+  // Cargar todos los datos en paralelo
+  const [
+    { data:checkins },
+    { data:ventasPub },
+    { data:habitaciones },
+    { data:reservasPeriodo },
+    { data:egresos }
+  ] = await Promise.all([
+    sb.from('check_ins').select('*, habitaciones(numero,categoria)').gte('check_in_fecha',desde).lte('check_in_fecha',hasta).order('created_at',{ascending:false}),
+    sb.from('ventas_publicas').select('*').gte('created_at',desdeTS).lte('created_at',hastaTS),
+    sb.from('habitaciones').select('estado'),
+    sb.from('reservas_web').select('id').gte('fecha_reserva',desde).lte('fecha_reserva',hasta),
+    sb.from('egresos').select('monto').gte('created_at',desdeTS).lte('created_at',hastaTS).catch(()=>({data:[]}))
+  ]);
+
+  // ── KPIs habitaciones ──
+  const totHabs = habitaciones?.length || 0;
+  const dispHabs = habitaciones?.filter(h=>h.estado==='disponible').length||0;
+  const ocupHabs = habitaciones?.filter(h=>h.estado==='ocupado').length||0;
+  const mantHabs = habitaciones?.filter(h=>h.estado==='mantenimiento').length||0;
+  const checkoutsPeriodo = checkins?.filter(c=>c.check_out_real).length||0;
+  const reservasPeriodoCnt = reservasPeriodo?.length||0;
+
+  document.getElementById('rep-tot-habs').textContent      = totHabs;
+  document.getElementById('rep-disponibles').textContent   = dispHabs;
+  document.getElementById('rep-ocupadas').textContent      = ocupHabs;
+  document.getElementById('rep-mant').textContent          = mantHabs;
+  document.getElementById('rep-reservas-hoy').textContent  = reservasPeriodoCnt;
+  document.getElementById('rep-checkouts-periodo').textContent = checkoutsPeriodo;
+
+  // ── KPIs financieros ──
+  const totalHabIngresos  = checkins?.reduce((s,c)=>s+(c.total_cobrado||0),0)||0;
+  const totalTiendaIngresos = ventasPub?.reduce((s,v)=>s+(v.total||0),0)||0;
+  const totalGeneral = totalHabIngresos + totalTiendaIngresos;
+  const totalEgresos = (egresos||[]).reduce((s,e)=>s+(e.monto||0),0);
+
   // Resumen por método de pago
-  const mMap={};
-  checkins?.forEach(c=>{const m=c.metodo_pago||'Efectivo';mMap[m]=(mMap[m]||0)+(c.total_cobrado||0);});
-  ventasPub?.forEach(v=>{const m=v.metodo_pago||'Efectivo';mMap[m]=(mMap[m]||0)+(v.total||0);});
-  const mColors={Efectivo:'#10b981',Tarjeta:'#3b82f6',Yape:'#7c3aed',Plin:'#ec4899'};
-  const mHTML=Object.entries(mMap).map(([m,v])=>
-    `<div class="stat-card-sys" style="border-left-color:${mColors[m]||'#6b7280'}"><p>${m}</p><h3>S/. ${v.toFixed(2)}</h3><small>por método</small></div>`
-  ).join('');
-  document.getElementById('reporte-stats').innerHTML=`
-    <div class="stat-card-sys"><p>Check-ins período</p><h3>${checkins?.length||0}</h3></div>
-    <div class="stat-card-sys"><p>Ingresos Habitaciones</p><h3>S/. ${totalHabTotal.toFixed(2)}</h3><small>Incluye consumos</small></div>
-    <div class="stat-card-sys"><p>Ingresos Tienda Pública</p><h3>S/. ${totalVentasPub.toFixed(2)}</h3></div>
-    <div class="stat-card-sys" style="border-left-color:#16a34a"><p>TOTAL GENERAL</p><h3>S/. ${(totalHabTotal+totalVentasPub).toFixed(2)}</h3></div>
-    ${mHTML}`;
-  // Habitaciones
-  const groupHab={};
-  checkins?.forEach(c=>{const k=c.habitaciones?.numero||'?';if(!groupHab[k])groupHab[k]={numero:k,categoria:c.habitaciones?.categoria,noches:0,total:0};if(c.check_out_real)groupHab[k].noches+=Math.ceil((new Date(c.check_out_real)-new Date(c.check_in_fecha))/(1000*60*60*24));groupHab[k].total+=c.total_cobrado||0;});
-  document.getElementById('reporte-habitaciones').innerHTML=Object.values(groupHab).length
-    ?Object.values(groupHab).map(h=>`<tr><td>Hab. ${String(h.numero).padStart(3,'0')} (${CATEGORIA_LABELS[h.categoria]||h.categoria})</td><td>${h.noches}</td><td>S/. ${h.total.toFixed(2)}</td></tr>`).join('')
-    :'<tr><td colspan="3" class="empty-row">Sin datos</td></tr>';
-  // Tienda pública
-  const groupPub={};
-  ventasPub?.forEach(v=>{try{const ls=JSON.parse(v.lineas_json||'[]');ls.forEach(l=>{if(!groupPub[l.nombre])groupPub[l.nombre]={nombre:l.nombre,cantidad:0,total:0};groupPub[l.nombre].cantidad+=l.cantidad;groupPub[l.nombre].total+=l.subtotal||0;});}catch(e){if(!groupPub['Varios'])groupPub['Varios']={nombre:'Varios',cantidad:0,total:0};groupPub['Varios'].cantidad++;groupPub['Varios'].total+=v.total||0;}});
-  document.getElementById('reporte-ventas').innerHTML=Object.values(groupPub).length
-    ?Object.values(groupPub).sort((a,b)=>b.total-a.total).map(p=>`<tr><td>${p.nombre}</td><td>${p.cantidad}</td><td>S/. ${p.total.toFixed(2)}</td></tr>`).join('')
-    :'<tr><td colspan="3" class="empty-row">Sin ventas en tienda pública</td></tr>';
-  // Detalle checkins
-  document.getElementById('reporte-checkins').innerHTML=checkins?.length
-    ?checkins.map(c=>{
-        const noches=c.check_out_real?Math.ceil((new Date(c.check_out_real)-new Date(c.check_in_fecha))/(1000*60*60*24)):'—';
-        const costoHab=noches!=='—'?noches*(c.precio_noche||0):0;
-        const consumos=Math.max(0,(c.total_cobrado||0)-costoHab);
+  const mMap = { Efectivo:0, Tarjeta:0, Yape:0, Plin:0 };
+  checkins?.forEach(c=>{ const m=c.metodo_pago||'Efectivo'; mMap[m]=(mMap[m]||0)+(c.total_cobrado||0); });
+  ventasPub?.forEach(v=>{ const m=v.metodo_pago||'Efectivo'; mMap[m]=(mMap[m]||0)+(v.total||0); });
+  const efectivoTotal = mMap['Efectivo']||0;
+  const otrosTotal = (mMap['Tarjeta']||0)+(mMap['Yape']||0)+(mMap['Plin']||0);
+
+  document.getElementById('rep-total-general').textContent = `S/. ${totalGeneral.toFixed(2)}`;
+  document.getElementById('rep-efectivo').textContent      = `S/. ${efectivoTotal.toFixed(2)}`;
+  document.getElementById('rep-otros').textContent         = `S/. ${otrosTotal.toFixed(2)}`;
+  document.getElementById('rep-co-completados').textContent = checkoutsPeriodo;
+  document.getElementById('rep-ventas-count').textContent   = `${ventasPub?.length||0} VENTAS`;
+  document.getElementById('rep-ventas-sub').textContent     = `S/. ${totalTiendaIngresos.toFixed(2)}`;
+  document.getElementById('rep-egresos-val').textContent    = `S/. ${totalEgresos.toFixed(2)}`;
+
+  // Periodo label
+  const lbl = document.getElementById('rep-periodo-label');
+  if(lbl) lbl.textContent = `Período: ${formatDate(desde)} — ${formatDate(hasta)}`;
+
+  // ── Tabla habitaciones ──
+  const groupHab = {};
+  checkins?.forEach(c=>{
+    const k = c.habitaciones?.numero||'?';
+    if(!groupHab[k]) groupHab[k]={ numero:k, categoria:c.habitaciones?.categoria, usos:0, total:0 };
+    groupHab[k].usos++;
+    groupHab[k].total += c.total_cobrado||0;
+  });
+  document.getElementById('reporte-habitaciones').innerHTML = Object.values(groupHab).length
+    ? Object.values(groupHab).map(h=>
+        `<tr>
+          <td><i class="fas fa-bed" style="color:var(--primary);margin-right:6px"></i>Hab. ${String(h.numero).padStart(3,'0')} <span class="badge badge-gold">${CATEGORIA_LABELS[h.categoria]||h.categoria||'—'}</span></td>
+          <td>${h.usos}</td>
+          <td><strong>S/. ${h.total.toFixed(2)}</strong></td>
+        </tr>`).join('')
+    : '<tr><td colspan="3" class="empty-row">Sin datos de habitaciones</td></tr>';
+
+  // ── Tabla tienda pública ──
+  const groupPub = {};
+  ventasPub?.forEach(v=>{
+    try {
+      const ls = JSON.parse(v.lineas_json||'[]');
+      ls.forEach(l=>{
+        if(!groupPub[l.nombre]) groupPub[l.nombre]={ nombre:l.nombre, cantidad:0, total:0 };
+        groupPub[l.nombre].cantidad += l.cantidad||0;
+        groupPub[l.nombre].total    += l.subtotal||0;
+      });
+    } catch(e) {
+      if(!groupPub['Varios']) groupPub['Varios']={ nombre:'Varios', cantidad:0, total:0 };
+      groupPub['Varios'].cantidad++;
+      groupPub['Varios'].total += v.total||0;
+    }
+  });
+  document.getElementById('reporte-ventas').innerHTML = Object.values(groupPub).length
+    ? Object.values(groupPub).sort((a,b)=>b.total-a.total).map(p=>
+        `<tr>
+          <td>${p.nombre}</td>
+          <td>${p.cantidad}</td>
+          <td><strong>S/. ${p.total.toFixed(2)}</strong></td>
+        </tr>`).join('')
+    : '<tr><td colspan="3" class="empty-row">Sin ventas en tienda pública</td></tr>';
+
+  // ── Tabla detalle check-outs ──
+  document.getElementById('reporte-checkins').innerHTML = checkins?.length
+    ? checkins.map(c=>{
+        const pen = c.datos_json ? (() => { try { const d=JSON.parse(c.datos_json||'{}'); return d.penalizacion||0; } catch(e){return 0;} })() : 0;
         return `<tr>
           <td class="sm">${c.serie_comprobante||'—'}</td>
-          <td>${String(c.habitaciones?.numero||'?').padStart(3,'0')}</td>
-          <td>${c.clientes?.nombre||c.nombre_huesped}</td>
+          <td>Hab. ${String(c.habitaciones?.numero||'?').padStart(3,'0')}</td>
+          <td>${c.nombre_huesped||'—'}</td>
           <td>${formatDate(c.check_in_fecha)}</td>
-          <td>${c.check_out_real?formatDate(c.check_out_real):'<span class="badge badge-verde">Activo</span>'}</td>
-          <td>${noches}</td>
-          <td>S/. ${costoHab.toFixed(2)}</td>
-          <td>S/. ${consumos.toFixed(2)}</td>
+          <td>${c.check_out_real ? formatDate(c.check_out_real) : '<span class="badge badge-verde">Activo</span>'}</td>
+          <td>S/. ${(c.precio_noche||0).toFixed(2)}</td>
+          <td>S/. ${Math.max(0,(c.total_cobrado||0)-(c.precio_noche||0)-pen).toFixed(2)}</td>
+          <td>${pen>0?`<span class="badge badge-rojo">S/. ${pen.toFixed(2)}</span>`:'—'}</td>
           <td>${c.metodo_pago||'—'}</td>
-          <td>S/. ${c.total_cobrado?.toFixed(2)||'—'}</td>
-        </tr>`;}).join('')
-    :'<tr><td colspan="10" class="empty-row">Sin datos</td></tr>';
+          <td><strong>S/. ${(c.total_cobrado||0).toFixed(2)}</strong></td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="10" class="empty-row">Sin datos</td></tr>';
 }
+
 
 // ══════════════════════════════════════════════════════════
 //  COMPROBANTES
@@ -1648,3 +1794,116 @@ async function eliminarHabitacion(id){
   await sb.from('habitaciones').delete().eq('id',id);
   showToast('Habitación eliminada','ok'); loadHabitaciones();
 }
+
+// ══════════════════════════════════════════════════════════
+//  EGRESOS
+// ══════════════════════════════════════════════════════════
+async function loadEgresos() {
+  const fechaFiltro = document.getElementById('egreso-filtro-fecha')?.value || '';
+  const catFiltro   = document.getElementById('egreso-filtro-cat')?.value || '';
+
+  let q = sb.from('egresos').select('*, usuarios(nombre)').order('fecha',{ascending:false}).order('created_at',{ascending:false});
+  if(fechaFiltro) q = q.eq('fecha', fechaFiltro);
+  if(catFiltro)   q = q.eq('categoria', catFiltro);
+  const { data:egresos } = await q;
+
+  // Stats
+  const totalEgresos = egresos?.reduce((s,e)=>s+(e.monto||0),0)||0;
+  const catCounts = {};
+  egresos?.forEach(e=>{ catCounts[e.categoria]=(catCounts[e.categoria]||0)+1; });
+  const catLabels = {compra:'Compras',servicio:'Servicios',personal:'Personal',mantenimiento:'Mantenimiento',otros:'Otros'};
+
+  document.getElementById('egresos-stats').innerHTML = `
+    <div class="stat-card-sys" style="border-left-color:var(--danger)">
+      <p>Total egresos</p><h3>S/. ${totalEgresos.toFixed(2)}</h3>
+      <small>${egresos?.length||0} registros</small>
+    </div>
+    ${Object.entries(catCounts).map(([cat,cnt])=>`
+      <div class="stat-card-sys">
+        <p>${catLabels[cat]||cat}</p><h3>${cnt}</h3><small>registros</small>
+      </div>`).join('')}`;
+
+  // Tabla
+  const BADGE = {compra:'badge-celeste',servicio:'badge-gold',personal:'badge-teal',mantenimiento:'badge-amarillo',otros:'badge-naranja'};
+  document.getElementById('egresos-table').innerHTML = egresos?.length
+    ? egresos.map(e=>`
+        <tr>
+          <td>${formatDate(e.fecha)}</td>
+          <td><span class="badge ${BADGE[e.categoria]||'badge-gold'}">${catLabels[e.categoria]||e.categoria}</span></td>
+          <td><strong>${e.descripcion||'—'}</strong>${e.proveedor?`<br><small style="color:var(--text-2)">${e.proveedor}</small>`:''}</td>
+          <td>${e.num_doc||'—'}</td>
+          <td>${e.tipo_doc||'—'}</td>
+          <td><strong style="color:var(--danger)">S/. ${(e.monto||0).toFixed(2)}</strong></td>
+          <td style="white-space:nowrap">
+            <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="editarEgreso(${e.id})">✏️ Editar</button>
+            <button class="sys-btn sys-btn-red sys-btn-sm" onclick="eliminarEgreso(${e.id})">🗑</button>
+          </td>
+        </tr>`).join('')
+    : '<tr><td colspan="7" class="empty-row">Sin egresos registrados</td></tr>';
+
+  // Botón nuevo
+  const btn = document.getElementById('btn-nuevo-egreso');
+  if(btn && !btn._bound) {
+    btn._bound = true;
+    btn.addEventListener('click', () => abrirModalEgreso());
+  }
+
+  // Filtros
+  ['egreso-filtro-fecha','egreso-filtro-cat'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && !el._bound){ el._bound=true; el.removeAttribute('min'); el.removeAttribute('max'); el.addEventListener('change',loadEgresos); }
+  });
+}
+
+function abrirModalEgreso(eg=null) {
+  document.getElementById('eg-id').value        = eg?.id||'';
+  document.getElementById('eg-fecha').value     = eg?.fecha || fechaPeruHoy();
+  document.getElementById('eg-categoria').value = eg?.categoria||'compra';
+  document.getElementById('eg-descripcion').value= eg?.descripcion||'';
+  document.getElementById('eg-proveedor').value = eg?.proveedor||'';
+  document.getElementById('eg-monto').value     = eg?.monto||'';
+  document.getElementById('eg-tipo-doc').value  = eg?.tipo_doc||'boleta';
+  document.getElementById('eg-num-doc').value   = eg?.num_doc||'';
+  document.getElementById('eg-obs').value       = eg?.observaciones||'';
+  document.getElementById('modal-egreso-title').innerHTML =
+    `<i class="fas fa-arrow-circle-down" style="color:var(--danger);margin-right:8px"></i>${eg?'Editar':'Registrar'} Egreso`;
+  openModal('modal-egreso');
+}
+
+async function editarEgreso(id) {
+  const { data:eg } = await sb.from('egresos').select('*').eq('id',id).single();
+  if(eg) abrirModalEgreso(eg);
+}
+
+async function eliminarEgreso(id) {
+  if(!confirm('¿Eliminar este egreso? Esta acción no se puede deshacer.')) return;
+  await sb.from('egresos').delete().eq('id',id);
+  showToast('Egreso eliminado','ok');
+  loadEgresos();
+}
+
+document.getElementById('btn-guardar-egreso')?.addEventListener('click', async()=>{
+  const id   = document.getElementById('eg-id').value;
+  const data = {
+    fecha:         document.getElementById('eg-fecha').value || fechaPeruHoy(),
+    categoria:     document.getElementById('eg-categoria').value,
+    descripcion:   document.getElementById('eg-descripcion').value.trim(),
+    proveedor:     document.getElementById('eg-proveedor').value.trim()||null,
+    monto:         parseFloat(document.getElementById('eg-monto').value)||0,
+    tipo_doc:      document.getElementById('eg-tipo-doc').value,
+    num_doc:       document.getElementById('eg-num-doc').value.trim()||null,
+    observaciones: document.getElementById('eg-obs').value.trim()||null,
+    usuario_id:    currentUserProfile?.id,
+    caja_id:       cajaActual?.id||null,
+  };
+  if(!data.descripcion){ showToast('La descripción es obligatoria','err'); return; }
+  if(data.monto<=0){ showToast('El monto debe ser mayor a 0','err'); return; }
+
+  if(id) await sb.from('egresos').update(data).eq('id',id);
+  else   await sb.from('egresos').insert(data);
+
+  showToast(id?'Egreso actualizado ✓':'Egreso registrado ✓','ok');
+  closeModal('modal-egreso');
+  loadEgresos();
+});
+

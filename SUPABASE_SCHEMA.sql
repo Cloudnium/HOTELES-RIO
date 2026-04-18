@@ -356,3 +356,24 @@ CREATE POLICY "auth_all_notif" ON notificaciones FOR ALL TO authenticated USING 
 -- 3. Activa el toggle "Source" para esa tabla
 -- O alternativamente desde SQL Editor:
 ALTER PUBLICATION supabase_realtime ADD TABLE notificaciones;
+
+
+-- ══════════════════════════════════════════════════════════
+--  TABLA EGRESOS v8
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS egresos (
+  id            BIGSERIAL PRIMARY KEY,
+  fecha         DATE NOT NULL DEFAULT CURRENT_DATE,
+  categoria     TEXT NOT NULL DEFAULT 'otros',
+  descripcion   TEXT NOT NULL,
+  proveedor     TEXT,
+  monto         NUMERIC(10,2) NOT NULL DEFAULT 0,
+  tipo_doc      TEXT DEFAULT 'boleta',
+  num_doc       TEXT,
+  observaciones TEXT,
+  usuario_id    BIGINT REFERENCES usuarios(id),
+  caja_id       BIGINT REFERENCES cajas(id),
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE egresos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "auth_all_egresos" ON egresos FOR ALL TO authenticated USING (true) WITH CHECK (true);

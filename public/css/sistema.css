@@ -657,3 +657,85 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
   60% { transform:rotate(-12deg); }
   100%{ transform:rotate(0deg); }
 }
+
+/* ══════════════════════════════════════════════════════════
+   REPORTES — Nuevo diseño dashboard v8
+══════════════════════════════════════════════════════════ */
+.rep-fecha-bar {
+  display:flex; align-items:center; justify-content:space-between;
+  background:#fff; border-radius:var(--radius); padding:14px 20px;
+  box-shadow:var(--shadow-sm); margin-bottom:16px; flex-wrap:wrap; gap:12px;
+}
+.rep-periodo-label { font-size:12px; color:var(--text-2); font-weight:600; }
+
+/* KPI grid habitaciones */
+.rep-kpi-grid {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:12px; margin-bottom:16px;
+}
+.rep-kpi-card {
+  border-radius:var(--radius); padding:18px 16px;
+  display:flex; align-items:center; justify-content:space-between;
+  box-shadow:var(--shadow-sm); transition:var(--transition); position:relative; overflow:hidden;
+}
+.rep-kpi-card:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
+.rep-kpi-body { display:flex; flex-direction:column; gap:2px; }
+.rep-kpi-val  { font-size:32px; font-weight:900; line-height:1; }
+.rep-kpi-lbl  { font-size:11px; font-weight:600; opacity:.8; margin-top:4px; }
+.rep-kpi-icon { font-size:38px; opacity:.25; }
+.rep-kpi-blue   { background:#dbeafe; color:#1e40af; }
+.rep-kpi-green  { background:#d1fae5; color:#065f46; }
+.rep-kpi-red    { background:#fee2e2; color:#991b1b; }
+.rep-kpi-yellow { background:#fef3c7; color:#92400e; }
+.rep-kpi-purple { background:#ede9fe; color:#5b21b6; }
+.rep-kpi-gold   { background:#fef9c3; color:#854d0e; }
+
+/* Financiero grid */
+.rep-financiero-grid {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:12px; margin-bottom:16px;
+}
+.rep-fin-card {
+  border-radius:var(--radius); padding:20px 18px;
+  display:flex; align-items:center; gap:14px;
+  box-shadow:var(--shadow-sm); transition:var(--transition);
+}
+.rep-fin-card:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
+.rep-fin-icon {
+  width:52px; height:52px; border-radius:14px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; flex-shrink:0;
+}
+.rep-fin-label { font-size:10px; font-weight:700; letter-spacing:.8px; text-transform:uppercase; opacity:.75; }
+.rep-fin-val   { font-size:22px; font-weight:900; margin:2px 0; line-height:1; }
+.rep-fin-sub   { font-size:11px; opacity:.65; }
+.rep-fin-total    { background:#f0fdf4; color:#14532d; }
+.rep-fin-total    .rep-fin-icon { background:#16a34a; color:#fff; }
+.rep-fin-efectivo { background:#f0fdf4; color:#166534; }
+.rep-fin-efectivo .rep-fin-icon { background:#22c55e; color:#fff; }
+.rep-fin-digital  { background:#eff6ff; color:#1e3a8a; }
+.rep-fin-digital  .rep-fin-icon { background:#3b82f6; color:#fff; }
+.rep-fin-checkouts{ background:#fdf4ff; color:#581c87; }
+.rep-fin-checkouts .rep-fin-icon { background:#9333ea; color:#fff; }
+.rep-fin-tienda   { background:#f0f9ff; color:#0c4a6e; }
+.rep-fin-tienda   .rep-fin-icon { background:#0ea5e9; color:#fff; }
+.rep-fin-egresos  { background:#fff1f2; color:#881337; }
+.rep-fin-egresos  .rep-fin-icon { background:#e11d48; color:#fff; }
+
+/* Checkout sanción box */
+.co-sancion-box {
+  background:var(--warning-light); border-radius:var(--radius-sm);
+  padding:12px 14px; margin:6px 0; border-left:3px solid var(--warning);
+}
+
+/* Egresos */
+.badge-teal { background:var(--teal-light,#ccfbf1); color:#134e4a; }
+
+@media(max-width:768px){
+  .rep-kpi-grid { grid-template-columns:repeat(2,1fr); }
+  .rep-financiero-grid { grid-template-columns:repeat(2,1fr); }
+}
+@media(max-width:480px){
+  .rep-kpi-grid { grid-template-columns:1fr 1fr; }
+  .rep-financiero-grid { grid-template-columns:1fr; }
+}
