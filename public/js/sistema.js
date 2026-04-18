@@ -2,8 +2,8 @@
 //  sistema.js — Sistema de Gestión Interna Hoteles Rio v5
 // ============================================================
 
-const SUPABASE_URL      = 'https://fqxhrpimdskvfnupjhxs.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxeGhycGltZHNrdmZudXBqaHhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyOTQ0MTksImV4cCI6MjA5MTg3MDQxOX0.08VbFHp6m5s3E5LniyMwEm61eamIM03hdIHx-gQ4jJs';
+const SUPABASE_URL      = 'https://wtaxskrorrcxculqcbkr.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0YXhza3JvcnJjeGN1bHFjYmtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTQ4NTEsImV4cCI6MjA5MjA5MDg1MX0.1v-_HliTU55iFXxYk8GGX_IDBP9f8lVivqMqBLSqsq0';
 
 const { createClient } = supabase;
 // persistSession:true garantiza que la sesión sobrevive cambios de pestaña/ventana
@@ -1197,8 +1197,12 @@ async function imprimirCaja(cajaId){
 
   const serie=await getSiguienteSerie('CAJA');
   // Cargar egresos del día para incluir en el ticket
-  const { data:egresosTicket } = await sb.from('egresos').select('monto').eq('fecha',caja?.fecha||fechaPeruHoy()).catch(()=>({data:[]}));
-  const totalEgresos = (egresosTicket||[]).reduce((s,e)=>s+(e.monto||0),0);
+  // Egresos del día — con manejo seguro de error
+  let totalEgresos = 0;
+  try {
+    const { data:egresosTicket } = await sb.from('egresos').select('monto').eq('fecha', caja?.fecha||fechaPeruHoy());
+    totalEgresos = (egresosTicket||[]).reduce((s,e)=>s+(e.monto||0), 0);
+  } catch(e) { console.warn('No se pudo cargar egresos:', e); }
   const datosTicket={
     serie, caja:`#${cajaId}`, usuario:caja?.usuarios?.nombre||'—',
     fecha:caja?.fecha, estado:caja?.estado,
@@ -1229,120 +1233,151 @@ function initReportes(){
   const primer=new Date(hoyDate.getFullYear(),hoyDate.getMonth(),1).toISOString().split('T')[0];
   const desdEl=document.getElementById('reporte-desde');
   const hastaEl=document.getElementById('reporte-hasta');
-  if(desdEl){desdEl.removeAttribute('max');desdEl.removeAttribute('min');if(!desdEl.value)desdEl.value=primer;}
-  if(hastaEl){hastaEl.removeAttribute('max');hastaEl.removeAttribute('min');if(!hastaEl.value)hastaEl.value=hoyStr;}
-  if(desdEl&&!desdEl._bound){desdEl._bound=true;desdEl.addEventListener('change',()=>{if(document.getElementById('reporte-hasta').value)generarReporte();});}
-  if(hastaEl&&!hastaEl._bound){hastaEl._bound=true;hastaEl.addEventListener('change',()=>{if(document.getElementById('reporte-desde').value)generarReporte();});}
-  generarReporte();
+  // Quitar restricciones de calendario
+  if(desdEl){ desdEl.removeAttribute('max'); desdEl.removeAttribute('min'); if(!desdEl.value) desdEl.value=primer; }
+  if(hastaEl){ hastaEl.removeAttribute('max'); hastaEl.removeAttribute('min'); if(!hastaEl.value) hastaEl.value=hoyStr; }
+  // Auto-generar al cambiar fechas
+  if(desdEl&&!desdEl._bound){ desdEl._bound=true; desdEl.addEventListener('change',()=>{ if(document.getElementById('reporte-hasta')?.value) generarReporte(); }); }
+  if(hastaEl&&!hastaEl._bound){ hastaEl._bound=true; hastaEl.addEventListener('change',()=>{ if(document.getElementById('reporte-desde')?.value) generarReporte(); }); }
+  // Pequeño delay para asegurar que la sección esté visible en el DOM
+  setTimeout(generarReporte, 50);
 }
 async function generarReporte(){
-  const desde = document.getElementById('reporte-desde').value;
-  const hasta  = document.getElementById('reporte-hasta').value;
+  const desde = document.getElementById('reporte-desde')?.value;
+  const hasta  = document.getElementById('reporte-hasta')?.value;
   if(!desde||!hasta){ showToast('Selecciona el rango de fechas','err'); return; }
   const desdeTS = desde+'T00:00:00';
   const hastaTS  = hasta+'T23:59:59';
 
-  // Cargar todos los datos en paralelo
-  const [
-    { data:checkins },
-    { data:ventasPub },
-    { data:habitaciones },
-    { data:reservasPeriodo },
-    { data:egresos }
-  ] = await Promise.all([
-    sb.from('check_ins').select('*, habitaciones(numero,categoria)').gte('check_in_fecha',desde).lte('check_in_fecha',hasta).order('created_at',{ascending:false}),
-    sb.from('ventas_publicas').select('*').gte('created_at',desdeTS).lte('created_at',hastaTS),
-    sb.from('habitaciones').select('estado'),
-    sb.from('reservas_web').select('id').gte('fecha_reserva',desde).lte('fecha_reserva',hasta),
-    sb.from('egresos').select('monto').gte('created_at',desdeTS).lte('created_at',hastaTS).catch(()=>({data:[]}))
+  // Helper seguro para queries que pueden fallar (tabla no existe, etc)
+  async function safeQuery(queryFn) {
+    try {
+      const result = await queryFn();
+      return result.data || [];
+    } catch(e) {
+      console.warn('Query error:', e);
+      return [];
+    }
+  }
+
+  // Cargar todos los datos — cada uno de forma segura e independiente
+  const [checkins, ventasPub, habitaciones, reservasPeriodo, egresosData] = await Promise.all([
+    safeQuery(()=> sb.from('check_ins')
+      .select('*, habitaciones(numero,categoria)')
+      .gte('check_in_fecha', desde)
+      .lte('check_in_fecha', hasta)
+      .order('created_at',{ascending:false})),
+    safeQuery(()=> sb.from('ventas_publicas')
+      .select('*')
+      .gte('created_at', desdeTS)
+      .lte('created_at', hastaTS)),
+    safeQuery(()=> sb.from('habitaciones').select('estado')),
+    safeQuery(()=> sb.from('reservas_web')
+      .select('id, fecha_reserva, estado')
+      .gte('fecha_reserva', desde)
+      .lte('fecha_reserva', hasta)
+      .order('fecha_reserva', {ascending:false})),
+    safeQuery(()=> sb.from('egresos')
+      .select('monto')
+      .gte('created_at', desdeTS)
+      .lte('created_at', hastaTS)),
   ]);
 
-  // ── KPIs habitaciones ──
-  const totHabs = habitaciones?.length || 0;
-  const dispHabs = habitaciones?.filter(h=>h.estado==='disponible').length||0;
-  const ocupHabs = habitaciones?.filter(h=>h.estado==='ocupado').length||0;
-  const mantHabs = habitaciones?.filter(h=>h.estado==='mantenimiento').length||0;
-  const checkoutsPeriodo = checkins?.filter(c=>c.check_out_real).length||0;
-  const reservasPeriodoCnt = reservasPeriodo?.length||0;
+  // ── KPIs habitaciones (estado actual, no filtrado por fecha) ──
+  const totHabs  = habitaciones.length;
+  const dispHabs = habitaciones.filter(h=>h.estado==='disponible').length;
+  const ocupHabs = habitaciones.filter(h=>h.estado==='ocupado').length;
+  const mantHabs = habitaciones.filter(h=>h.estado==='mantenimiento').length;
+  const checkoutsPeriodo = checkins.filter(c=>c.check_out_real).length;
+  const reservasCnt = reservasPeriodo.length;
+  console.log('DEBUG reportes:', {checkins: checkins.length, ventasPub: ventasPub.length, habitaciones: habitaciones.length, reservasCnt, egresosData: egresosData.length});
 
-  document.getElementById('rep-tot-habs').textContent      = totHabs;
-  document.getElementById('rep-disponibles').textContent   = dispHabs;
-  document.getElementById('rep-ocupadas').textContent      = ocupHabs;
-  document.getElementById('rep-mant').textContent          = mantHabs;
-  document.getElementById('rep-reservas-hoy').textContent  = reservasPeriodoCnt;
-  document.getElementById('rep-checkouts-periodo').textContent = checkoutsPeriodo;
+  const set = (id, val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
+  set('rep-tot-habs',           totHabs);
+  set('rep-disponibles',        dispHabs);
+  set('rep-ocupadas',           ocupHabs);
+  set('rep-mant',               mantHabs);
+  set('rep-reservas-hoy',       reservasCnt);
+  set('rep-checkouts-periodo',  checkoutsPeriodo);
 
   // ── KPIs financieros ──
-  const totalHabIngresos  = checkins?.reduce((s,c)=>s+(c.total_cobrado||0),0)||0;
-  const totalTiendaIngresos = ventasPub?.reduce((s,v)=>s+(v.total||0),0)||0;
-  const totalGeneral = totalHabIngresos + totalTiendaIngresos;
-  const totalEgresos = (egresos||[]).reduce((s,e)=>s+(e.monto||0),0);
+  const totalHab    = checkins.reduce((s,c)=>s+(c.total_cobrado||0), 0);
+  const totalTienda = ventasPub.reduce((s,v)=>s+(v.total||0), 0);
+  const totalGen    = totalHab + totalTienda;
+  const totalEgr    = egresosData.reduce((s,e)=>s+(e.monto||0), 0);
 
   // Resumen por método de pago
-  const mMap = { Efectivo:0, Tarjeta:0, Yape:0, Plin:0 };
-  checkins?.forEach(c=>{ const m=c.metodo_pago||'Efectivo'; mMap[m]=(mMap[m]||0)+(c.total_cobrado||0); });
-  ventasPub?.forEach(v=>{ const m=v.metodo_pago||'Efectivo'; mMap[m]=(mMap[m]||0)+(v.total||0); });
-  const efectivoTotal = mMap['Efectivo']||0;
-  const otrosTotal = (mMap['Tarjeta']||0)+(mMap['Yape']||0)+(mMap['Plin']||0);
+  const mMap = {};
+  checkins.forEach(c=>{  const m=c.metodo_pago||'Efectivo'; mMap[m]=(mMap[m]||0)+(c.total_cobrado||0); });
+  ventasPub.forEach(v=>{ const m=v.metodo_pago||'Efectivo'; mMap[m]=(mMap[m]||0)+(v.total||0); });
+  const efectivo = mMap['Efectivo']||0;
+  const otros    = (mMap['Tarjeta']||0)+(mMap['Yape']||0)+(mMap['Plin']||0);
 
-  document.getElementById('rep-total-general').textContent = `S/. ${totalGeneral.toFixed(2)}`;
-  document.getElementById('rep-efectivo').textContent      = `S/. ${efectivoTotal.toFixed(2)}`;
-  document.getElementById('rep-otros').textContent         = `S/. ${otrosTotal.toFixed(2)}`;
-  document.getElementById('rep-co-completados').textContent = checkoutsPeriodo;
-  document.getElementById('rep-ventas-count').textContent   = `${ventasPub?.length||0} VENTAS`;
-  document.getElementById('rep-ventas-sub').textContent     = `S/. ${totalTiendaIngresos.toFixed(2)}`;
-  document.getElementById('rep-egresos-val').textContent    = `S/. ${totalEgresos.toFixed(2)}`;
+  set('rep-total-general',       `S/. ${totalGen.toFixed(2)}`);
+  set('rep-efectivo',            `S/. ${efectivo.toFixed(2)}`);
+  set('rep-otros',               `S/. ${otros.toFixed(2)}`);
+  set('rep-co-completados',      checkoutsPeriodo);
+  set('rep-ventas-count',        `${ventasPub.length} VENTAS`);
+  set('rep-ventas-sub',          `S/. ${totalTienda.toFixed(2)}`);
+  set('rep-egresos-val',         `S/. ${totalEgr.toFixed(2)}`);
 
-  // Periodo label
   const lbl = document.getElementById('rep-periodo-label');
   if(lbl) lbl.textContent = `Período: ${formatDate(desde)} — ${formatDate(hasta)}`;
 
-  // ── Tabla habitaciones ──
+  // ── Tabla: ingresos por habitación ──
   const groupHab = {};
-  checkins?.forEach(c=>{
-    const k = c.habitaciones?.numero||'?';
-    if(!groupHab[k]) groupHab[k]={ numero:k, categoria:c.habitaciones?.categoria, usos:0, total:0 };
+  checkins.forEach(c=>{
+    const k = c.habitaciones?.numero || '?';
+    if(!groupHab[k]) groupHab[k]={ numero:k, cat:c.habitaciones?.categoria, usos:0, total:0 };
     groupHab[k].usos++;
     groupHab[k].total += c.total_cobrado||0;
   });
-  document.getElementById('reporte-habitaciones').innerHTML = Object.values(groupHab).length
-    ? Object.values(groupHab).map(h=>
-        `<tr>
-          <td><i class="fas fa-bed" style="color:var(--primary);margin-right:6px"></i>Hab. ${String(h.numero).padStart(3,'0')} <span class="badge badge-gold">${CATEGORIA_LABELS[h.categoria]||h.categoria||'—'}</span></td>
+  const tbHab = document.getElementById('reporte-habitaciones');
+  if(tbHab) tbHab.innerHTML = Object.values(groupHab).length
+    ? Object.values(groupHab).map(h=>`
+        <tr>
+          <td><i class="fas fa-bed" style="color:var(--primary);margin-right:6px"></i>
+            Hab. ${String(h.numero).padStart(3,'0')}
+            <span class="badge badge-gold">${CATEGORIA_LABELS[h.cat]||h.cat||'—'}</span>
+          </td>
           <td>${h.usos}</td>
           <td><strong>S/. ${h.total.toFixed(2)}</strong></td>
         </tr>`).join('')
-    : '<tr><td colspan="3" class="empty-row">Sin datos de habitaciones</td></tr>';
+    : '<tr><td colspan="3" class="empty-row">Sin check-ins en este período</td></tr>';
 
-  // ── Tabla tienda pública ──
+  // ── Tabla: ventas tienda pública ──
   const groupPub = {};
-  ventasPub?.forEach(v=>{
+  ventasPub.forEach(v=>{
     try {
       const ls = JSON.parse(v.lineas_json||'[]');
       ls.forEach(l=>{
         if(!groupPub[l.nombre]) groupPub[l.nombre]={ nombre:l.nombre, cantidad:0, total:0 };
-        groupPub[l.nombre].cantidad += l.cantidad||0;
-        groupPub[l.nombre].total    += l.subtotal||0;
+        groupPub[l.nombre].cantidad += Number(l.cantidad)||0;
+        groupPub[l.nombre].total    += Number(l.subtotal)||0;
       });
-    } catch(e) {
+    } catch(_) {
       if(!groupPub['Varios']) groupPub['Varios']={ nombre:'Varios', cantidad:0, total:0 };
       groupPub['Varios'].cantidad++;
       groupPub['Varios'].total += v.total||0;
     }
   });
-  document.getElementById('reporte-ventas').innerHTML = Object.values(groupPub).length
-    ? Object.values(groupPub).sort((a,b)=>b.total-a.total).map(p=>
-        `<tr>
+  const tbPub = document.getElementById('reporte-ventas');
+  if(tbPub) tbPub.innerHTML = Object.values(groupPub).length
+    ? Object.values(groupPub).sort((a,b)=>b.total-a.total).map(p=>`
+        <tr>
           <td>${p.nombre}</td>
           <td>${p.cantidad}</td>
           <td><strong>S/. ${p.total.toFixed(2)}</strong></td>
         </tr>`).join('')
     : '<tr><td colspan="3" class="empty-row">Sin ventas en tienda pública</td></tr>';
 
-  // ── Tabla detalle check-outs ──
-  document.getElementById('reporte-checkins').innerHTML = checkins?.length
+  // ── Tabla: detalle check-outs ──
+  const tbCo = document.getElementById('reporte-checkins');
+  if(tbCo) tbCo.innerHTML = checkins.length
     ? checkins.map(c=>{
-        const pen = c.datos_json ? (() => { try { const d=JSON.parse(c.datos_json||'{}'); return d.penalizacion||0; } catch(e){return 0;} })() : 0;
+        let pen = 0;
+        try { const d=JSON.parse(c.datos_json||'{}'); pen=Number(d.penalizacion)||0; } catch(_){}
+        const consumos = Math.max(0,(c.total_cobrado||0)-(c.precio_noche||0)-pen);
         return `<tr>
           <td class="sm">${c.serie_comprobante||'—'}</td>
           <td>Hab. ${String(c.habitaciones?.numero||'?').padStart(3,'0')}</td>
@@ -1350,13 +1385,13 @@ async function generarReporte(){
           <td>${formatDate(c.check_in_fecha)}</td>
           <td>${c.check_out_real ? formatDate(c.check_out_real) : '<span class="badge badge-verde">Activo</span>'}</td>
           <td>S/. ${(c.precio_noche||0).toFixed(2)}</td>
-          <td>S/. ${Math.max(0,(c.total_cobrado||0)-(c.precio_noche||0)-pen).toFixed(2)}</td>
+          <td>S/. ${consumos.toFixed(2)}</td>
           <td>${pen>0?`<span class="badge badge-rojo">S/. ${pen.toFixed(2)}</span>`:'—'}</td>
           <td>${c.metodo_pago||'—'}</td>
           <td><strong>S/. ${(c.total_cobrado||0).toFixed(2)}</strong></td>
         </tr>`;
       }).join('')
-    : '<tr><td colspan="10" class="empty-row">Sin datos</td></tr>';
+    : '<tr><td colspan="10" class="empty-row">Sin check-ins en este período</td></tr>';
 }
 
 
@@ -1856,17 +1891,23 @@ async function loadEgresos() {
 }
 
 function abrirModalEgreso(eg=null) {
-  document.getElementById('eg-id').value        = eg?.id||'';
-  document.getElementById('eg-fecha').value     = eg?.fecha || fechaPeruHoy();
-  document.getElementById('eg-categoria').value = eg?.categoria||'compra';
+  document.getElementById('eg-id').value         = eg?.id||'';
+  document.getElementById('eg-fecha').value      = eg?.fecha || fechaPeruHoy();
+  document.getElementById('eg-categoria').value  = eg?.categoria||'compra';
   document.getElementById('eg-descripcion').value= eg?.descripcion||'';
-  document.getElementById('eg-proveedor').value = eg?.proveedor||'';
-  document.getElementById('eg-monto').value     = eg?.monto||'';
-  document.getElementById('eg-tipo-doc').value  = eg?.tipo_doc||'boleta';
-  document.getElementById('eg-num-doc').value   = eg?.num_doc||'';
-  document.getElementById('eg-obs').value       = eg?.observaciones||'';
+  document.getElementById('eg-proveedor').value  = eg?.proveedor||'';
+  document.getElementById('eg-monto').value      = eg?.monto||'';
+  document.getElementById('eg-tipo-doc').value   = eg?.tipo_doc||'boleta';
+  document.getElementById('eg-num-doc').value    = eg?.num_doc||'';
+  document.getElementById('eg-obs').value        = eg?.observaciones||'';
   document.getElementById('modal-egreso-title').innerHTML =
     `<i class="fas fa-arrow-circle-down" style="color:var(--danger);margin-right:8px"></i>${eg?'Editar':'Registrar'} Egreso`;
+  // Conectar botón guardar CADA VEZ que abre el modal (así siempre funciona)
+  const btnG = document.getElementById('btn-guardar-egreso');
+  if(btnG) {
+    btnG.onclick = null; // limpiar listener anterior
+    btnG.onclick = guardarEgreso;
+  }
   openModal('modal-egreso');
 }
 
@@ -1882,7 +1923,7 @@ async function eliminarEgreso(id) {
   loadEgresos();
 }
 
-document.getElementById('btn-guardar-egreso')?.addEventListener('click', async()=>{
+async function guardarEgreso() {
   const id   = document.getElementById('eg-id').value;
   const data = {
     fecha:         document.getElementById('eg-fecha').value || fechaPeruHoy(),
@@ -1899,11 +1940,187 @@ document.getElementById('btn-guardar-egreso')?.addEventListener('click', async()
   if(!data.descripcion){ showToast('La descripción es obligatoria','err'); return; }
   if(data.monto<=0){ showToast('El monto debe ser mayor a 0','err'); return; }
 
-  if(id) await sb.from('egresos').update(data).eq('id',id);
-  else   await sb.from('egresos').insert(data);
+  const { error } = id
+    ? await sb.from('egresos').update(data).eq('id',id)
+    : await sb.from('egresos').insert(data);
 
+  if(error){ showToast('Error al guardar: '+error.message,'err'); return; }
   showToast(id?'Egreso actualizado ✓':'Egreso registrado ✓','ok');
   closeModal('modal-egreso');
   loadEgresos();
-});
+}
 
+
+
+// ══════════════════════════════════════════════════════════
+//  REPORTE PDF
+// ══════════════════════════════════════════════════════════
+async function descargarReportePDF() {
+  const desde = document.getElementById('reporte-desde')?.value;
+  const hasta  = document.getElementById('reporte-hasta')?.value;
+  if(!desde||!hasta){ showToast('Selecciona el rango de fechas primero','err'); return; }
+
+  showToast('Generando PDF...','ok');
+
+  // Recolectar datos del DOM ya renderizado
+  const periodo   = document.getElementById('rep-periodo-label')?.textContent || `${desde} — ${hasta}`;
+  const totHabs   = document.getElementById('rep-tot-habs')?.textContent||'—';
+  const disp      = document.getElementById('rep-disponibles')?.textContent||'—';
+  const ocup      = document.getElementById('rep-ocupadas')?.textContent||'—';
+  const mant      = document.getElementById('rep-mant')?.textContent||'—';
+  const resHoy    = document.getElementById('rep-reservas-hoy')?.textContent||'—';
+  const coP       = document.getElementById('rep-checkouts-periodo')?.textContent||'—';
+  const totGen    = document.getElementById('rep-total-general')?.textContent||'S/. 0.00';
+  const efect     = document.getElementById('rep-efectivo')?.textContent||'S/. 0.00';
+  const otros     = document.getElementById('rep-otros')?.textContent||'S/. 0.00';
+  const coComp    = document.getElementById('rep-co-completados')?.textContent||'0';
+  const ventasC   = document.getElementById('rep-ventas-count')?.textContent||'0';
+  const ventasS   = document.getElementById('rep-ventas-sub')?.textContent||'S/. 0.00';
+  const egrVal    = document.getElementById('rep-egresos-val')?.textContent||'S/. 0.00';
+
+  // Capturar tablas del DOM
+  function tablaHTML(tbodyId, headers) {
+    const tbody = document.getElementById(tbodyId);
+    if(!tbody) return '<tr><td colspan="10">Sin datos</td></tr>';
+    return tbody.innerHTML;
+  }
+
+  const habsRows  = tablaHTML('reporte-habitaciones');
+  const tiendaRows= tablaHTML('reporte-ventas');
+  const coRows    = tablaHTML('reporte-checkins');
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reporte Hoteles Rio — ${periodo}</title>
+<style>
+  @page { size: A4; margin: 15mm 12mm; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #1e1b4b; background:#fff; }
+  
+  /* Cabecera */
+  .header { display:flex; align-items:center; justify-content:space-between; padding-bottom:10px; border-bottom:3px solid #7c3aed; margin-bottom:14px; }
+  .header-logo { font-size:20px; font-weight:900; color:#7c3aed; }
+  .header-sub  { font-size:11px; color:#6b7280; }
+  .header-right { text-align:right; }
+  .header-right .periodo { font-size:12px; font-weight:700; color:#1e1b4b; }
+  .header-right .fecha   { font-size:10px; color:#6b7280; margin-top:2px; }
+
+  /* KPI grids */
+  .kpi-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-bottom:10px; }
+  .kpi-card { border-radius:6px; padding:8px; text-align:center; }
+  .kpi-val  { font-size:22px; font-weight:900; line-height:1; }
+  .kpi-lbl  { font-size:9px; font-weight:600; margin-top:3px; opacity:.8; }
+  .kpi-blue   { background:#dbeafe; color:#1e40af; }
+  .kpi-green  { background:#d1fae5; color:#065f46; }
+  .kpi-red    { background:#fee2e2; color:#991b1b; }
+  .kpi-yellow { background:#fef3c7; color:#92400e; }
+  .kpi-purple { background:#ede9fe; color:#5b21b6; }
+  .kpi-gold   { background:#fef9c3; color:#854d0e; }
+
+  .fin-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:14px; }
+  .fin-card { border-radius:6px; padding:10px 12px; display:flex; align-items:center; gap:8px; }
+  .fin-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; flex-shrink:0; }
+  .fin-lbl  { font-size:9px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; opacity:.75; }
+  .fin-val  { font-size:16px; font-weight:900; line-height:1; margin:2px 0; }
+  .fin-sub  { font-size:9px; opacity:.65; }
+  .fin-tot  { background:#f0fdf4; color:#14532d; } .fin-tot .fin-icon  { background:#16a34a; color:#fff; }
+  .fin-ef   { background:#f0fdf4; color:#166534; } .fin-ef .fin-icon   { background:#22c55e; color:#fff; }
+  .fin-ot   { background:#eff6ff; color:#1e3a8a; } .fin-ot .fin-icon   { background:#3b82f6; color:#fff; }
+  .fin-co   { background:#fdf4ff; color:#581c87; } .fin-co .fin-icon   { background:#9333ea; color:#fff; }
+  .fin-ti   { background:#f0f9ff; color:#0c4a6e; } .fin-ti .fin-icon   { background:#0ea5e9; color:#fff; }
+  .fin-eg   { background:#fff1f2; color:#881337; } .fin-eg .fin-icon   { background:#e11d48; color:#fff; }
+
+  /* Tablas */
+  .section-title { font-size:12px; font-weight:700; color:#1e1b4b; margin:12px 0 6px; padding-left:6px; border-left:3px solid #7c3aed; }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  table { width:100%; border-collapse:collapse; }
+  th { background:#f5f3ff; padding:5px 8px; text-align:left; font-size:9px; font-weight:700; color:#6b7280; letter-spacing:.5px; text-transform:uppercase; }
+  td { padding:5px 8px; font-size:10px; color:#374151; border-top:1px solid #e8e5f5; }
+  tr:hover td { background:#faf7ff; }
+  .empty-row { text-align:center; color:#9ca3af; font-style:italic; padding:12px!important; }
+  .badge { display:inline-block; padding:1px 7px; border-radius:20px; font-size:9px; font-weight:600; }
+  .badge-verde  { background:#d1fae5; color:#065f46; }
+  .badge-rojo   { background:#fee2e2; color:#991b1b; }
+  .badge-gold   { background:#ede9fe; color:#5b21b6; }
+  .footer { margin-top:14px; padding-top:8px; border-top:1px solid #e8e5f5; text-align:center; font-size:9px; color:#9ca3af; }
+  @media print { button { display:none!important; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-logo">🏨 HOTELES RIO</div>
+    <div class="header-sub">Sistema de Gestión Interna</div>
+  </div>
+  <div class="header-right">
+    <div class="periodo">📊 REPORTE DE GESTIÓN</div>
+    <div class="fecha">${periodo}</div>
+    <div class="fecha">Generado: ${new Date().toLocaleString('es-PE')}</div>
+  </div>
+</div>
+
+<!-- KPIs habitaciones -->
+<div class="kpi-grid">
+  <div class="kpi-card kpi-blue">  <div class="kpi-val">${totHabs}</div><div class="kpi-lbl">Total habitaciones</div></div>
+  <div class="kpi-card kpi-green"> <div class="kpi-val">${disp}</div>  <div class="kpi-lbl">Disponibles</div></div>
+  <div class="kpi-card kpi-red">   <div class="kpi-val">${ocup}</div>  <div class="kpi-lbl">Ocupadas</div></div>
+  <div class="kpi-card kpi-yellow"><div class="kpi-val">${mant}</div>  <div class="kpi-lbl">Mantenimiento</div></div>
+  <div class="kpi-card kpi-purple"><div class="kpi-val">${resHoy}</div><div class="kpi-lbl">Reservas período</div></div>
+  <div class="kpi-card kpi-gold">  <div class="kpi-val">${coP}</div>  <div class="kpi-lbl">Check-outs</div></div>
+</div>
+
+<!-- KPIs financieros -->
+<div class="fin-grid">
+  <div class="fin-card fin-tot"><div class="fin-icon">$</div><div><div class="fin-lbl">TOTAL GENERAL</div><div class="fin-val">${totGen}</div></div></div>
+  <div class="fin-card fin-ef"> <div class="fin-icon">💵</div><div><div class="fin-lbl">EFECTIVO</div><div class="fin-val">${efect}</div><div class="fin-sub">por método</div></div></div>
+  <div class="fin-card fin-ot"> <div class="fin-icon">💳</div><div><div class="fin-lbl">OTROS MÉTODOS</div><div class="fin-val">${otros}</div><div class="fin-sub">Tarjeta/Yape/Plin</div></div></div>
+  <div class="fin-card fin-co"> <div class="fin-icon">✓</div><div><div class="fin-lbl">CHECK-OUTS COMPLETADOS</div><div class="fin-val">${coComp}</div></div></div>
+  <div class="fin-card fin-ti"> <div class="fin-icon">🛒</div><div><div class="fin-lbl">VENTAS TIENDA</div><div class="fin-val">${ventasC}</div><div class="fin-sub">${ventasS}</div></div></div>
+  <div class="fin-card fin-eg"> <div class="fin-icon">↓</div><div><div class="fin-lbl">EGRESOS DEL PERÍODO</div><div class="fin-val">${egrVal}</div></div></div>
+</div>
+
+<!-- Tablas -->
+<div class="two-col">
+  <div>
+    <div class="section-title">🛏 Ingresos por Habitaciones + Consumos</div>
+    <table>
+      <thead><tr><th>Habitación</th><th>Usos</th><th>Total</th></tr></thead>
+      <tbody>${habsRows}</tbody>
+    </table>
+  </div>
+  <div>
+    <div class="section-title">🛒 Ingresos Tienda Pública</div>
+    <table>
+      <thead><tr><th>Producto</th><th>Qty</th><th>Total</th></tr></thead>
+      <tbody>${tiendaRows}</tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section-title">📋 Detalle de Check-outs del período</div>
+<table>
+  <thead><tr><th>Serie</th><th>Hab.</th><th>Cliente</th><th>Check-in</th><th>Check-out</th><th>Hab. S/.</th><th>Consumos</th><th>Sanción</th><th>Pago</th><th>Total</th></tr></thead>
+  <tbody>${coRows}</tbody>
+</table>
+
+<div class="footer">
+  Hoteles Rio — Sistema de Gestión Interna • Reporte generado automáticamente
+</div>
+
+<div style="text-align:center;margin-top:16px">
+  <button onclick="window.print()" style="padding:10px 28px;font-size:14px;cursor:pointer;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-family:sans-serif;font-weight:700">
+    🖨 Imprimir / Guardar PDF
+  </button>
+</div>
+
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=900,height=700');
+  if(!win){ showToast('Permite ventanas emergentes para generar el PDF','err'); return; }
+  win.document.write(html);
+  win.document.close();
+  setTimeout(()=> win.focus(), 300);
+}

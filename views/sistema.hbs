@@ -362,7 +362,12 @@
               <label>Hasta</label>
               <input type="date" class="sys-input" id="reporte-hasta">
             </div>
-            <span id="rep-periodo-label" class="rep-periodo-label"></span>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span id="rep-periodo-label" class="rep-periodo-label"></span>
+              <button class="sys-btn sys-btn-outline" onclick="descargarReportePDF()" id="btn-pdf-reporte">
+                <i class="fas fa-file-pdf"></i> Descargar PDF
+              </button>
+            </div>
           </div>
 
           <!-- Fila 1: KPIs de habitaciones -->

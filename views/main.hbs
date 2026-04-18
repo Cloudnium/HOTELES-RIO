@@ -1,0 +1,42 @@
+<!DOCTYPE html> <!-- caracteristicas de la web -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hoteles Rio</title>
+  <meta name="description" content="Hoteles Rio — Calidad y seguridad a detalle.">
+  <meta name="google-site-verification" content="XMS1ZMoYPWZbARa9PVl1pD-pV02CoSUMqQuf3lko4tc" />
+  <!-- ============================================================
+    FUENTES — Si quieres cambiar las fuentes, edita estos links
+    Actuales: Cormorant Garamond (títulos) + Jost (texto)
+  ============================================================ -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@200;300;400;500&display=swap" rel="stylesheet">
+
+  <!-- ============================================================
+    FAVICON — Reemplaza estos archivos en public/images/logos/y la imagen del logo
+  ============================================================ -->
+  <link rel="icon" type="image/png" href="/images/logos/logomin.png">
+
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/base.css">
+  {{#unless isSistema}}<link rel="stylesheet" href="/css/nav.css">{{/unless}}
+  {{#unless isSistema}}<link rel="stylesheet" href="/css/footer.css">{{/unless}}
+  <link rel="stylesheet" href="/css/animations.css">
+</head>
+<body class="page-{{page}}{{#if isSistema}} page-sistema-full{{/if}}">
+
+  {{#unless isSistema}}{{> nav}}{{/unless}}
+
+  <main>
+    {{{body}}}
+  </main>
+
+  {{#unless isSistema}}{{> footer}}{{/unless}}
+
+  <script src="/js/main.js"></script>
+  
+  {{#unless isSistema}}{{> whatsapp-btn}}{{/unless}} 
+</body>
+</html>

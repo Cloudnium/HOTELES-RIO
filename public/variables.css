@@ -1,0 +1,102 @@
+/* ============================================================
+   variables.css — COLORES Y CONFIGURACIÓN GLOBAL
+   ¡Edita aquí para cambiar el tema visual del sitio!
+============================================================ */
+
+:root {
+  /* ── Paleta principal ── */
+  --cream:        #F0EBE1;   /* Fondo principal */
+  --cream-dark:   #E5DDD0;   /* Fondo secciones alternas */
+  --warm-brown:   #6B5744;   /* Marrón cálido */
+  --gold:         #C4A35A;   /* Color dorado principal */
+  --gold-light:   #D4B97A;   /* Dorado claro */
+  --gold-hover:   #B8924A;   /* Dorado hover */
+  --charcoal:     #2C2620;   /* Fondo oscuro / texto oscuro */
+  --charcoal-mid: #3D2B1F;   /* Oscuro medio */
+  --text-dark:    #1E1812;   /* Texto principal oscuro */
+  --text-mid:     #5A4A3A;   /* Texto secundario */
+  --text-light:   #9A8A7A;   /* Texto sutil */
+  --white:        #FDFAF6;   /* Blanco cálido */
+  --border:       rgba(196,163,90,0.2);
+
+  /* ── Tipografía ── */
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body:    'Jost', system-ui, sans-serif;
+
+  /* ── Espaciado ── */
+  --container:    1180px;
+  --section-pad:  96px 40px;
+  --nav-height:   76px;
+
+  /* ── Bordes y sombras ── */
+  --radius:       4px;
+  --shadow-sm:    0 2px 12px rgba(44,38,32,0.08);
+  --shadow-md:    0 8px 32px rgba(44,38,32,0.12);
+  --shadow-lg:    0 20px 60px rgba(44,38,32,0.18);
+
+  /* ── Transiciones ── */
+  --transition:   0.3s ease;
+  --transition-slow: 0.6s ease;
+
+  /* ── IMÁGENES DE FONDO HERO ──────────────────────────────
+     Cambia estas rutas por tus imágenes reales
+     Tamaño recomendado: 1920 x 900px (JPG optimizado)
+  ────────────────────────────────────────────────────────── */
+  --hero-inicio:       url('/images/hero-inicio.png');
+  --hero-habitaciones: url('/images/hero-habitaciones.jpg');
+  --hero-galeria:      url('/images/hero-galeria.jpg');
+  --hero-reservas:     url('/images/hero-reservas.jpg');
+  --hero-contacto:     url('/images/hero-contacto.jpg');
+  --banner-cta:        url('/images/banner-cta.jpg');
+}
+
+/* HERO GENERAL */
+.hero {
+  position: relative;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--white);
+  overflow: hidden;
+}
+
+/* FONDO CORRECTO */
+.hero-inicio {
+  background-image: var(--hero-inicio);
+  background-size: cover;       /* 🔥 evita collage */
+  background-position: center;  /* centra la imagen */
+  background-repeat: no-repeat; /* 🔥 evita repetición */
+}
+
+/* CAPA OSCURA */
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 1;
+}
+
+/* CONTENIDO ENCIMA */
+.hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 800px;
+}
+
+/* TEXTO */
+.hero-title {
+  font-size: 64px;
+  font-family: var(--font-display);
+}
+
+.hero-tagline {
+  font-size: 18px;
+  margin: 20px 0;
+}
+
+/* BOTONES */
+.hero-actions {
+  margin-top: 20px;
+}
