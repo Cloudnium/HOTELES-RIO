@@ -2,8 +2,8 @@
 //  sistema.js — Sistema de Gestión Interna Hoteles Rio v5
 // ============================================================
 
-const SUPABASE_URL      = 'https://wtaxskrorrcxculqcbkr.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind0YXhza3JvcnJjeGN1bHFjYmtyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTQ4NTEsImV4cCI6MjA5MjA5MDg1MX0.1v-_HliTU55iFXxYk8GGX_IDBP9f8lVivqMqBLSqsq0';
+const SUPABASE_URL      = 'https://xeuugehcomgmkczzheno.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhldXVnZWhjb21nbWtjenpoZW5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTU5NjgsImV4cCI6MjA5MjA5MTk2OH0.9wJFk8s5cBjNBIXhZnzCXm9Sqz2qziWRdBLiNey3lZU';
 
 const { createClient } = supabase;
 // persistSession:true garantiza que la sesión sobrevive cambios de pestaña/ventana
