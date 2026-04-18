@@ -207,18 +207,18 @@ ON CONFLICT (numero) DO NOTHING;
 
 -- PREMIUM (201–216)
 INSERT INTO habitaciones (numero, piso, categoria, precio_noche) VALUES
-(201,2,'premium',120),(202,2,'premium',120),(203,2,'premium',120),
-(204,2,'premium',120),(205,2,'premium',120),(206,2,'premium',120),
-(207,2,'premium',120),(208,2,'premium',120),(209,2,'premium',120),
-(210,2,'premium',120),(211,2,'premium',120),(212,2,'premium',120),
-(213,2,'premium',120),(214,2,'premium',120),(215,2,'premium',120),
-(216,2,'premium',120)
+(201,2,'premium',60),(202,2,'premium',60),(203,2,'premium',60),
+(204,2,'premium',60),(205,2,'premium',60),(206,2,'premium',60),
+(207,2,'premium',60),(208,2,'premium',60),(209,2,'premium',60),
+(210,2,'premium',60),(211,2,'premium',60),(212,2,'premium',60),
+(213,2,'premium',60),(214,2,'premium',60),(215,2,'premium',60),
+(216,2,'premium',60)
 ON CONFLICT (numero) DO NOTHING;
 
 -- SUITE (217–220)
 INSERT INTO habitaciones (numero, piso, categoria, precio_noche) VALUES
-(217,2,'suite',250),(218,2,'suite',250),
-(219,2,'suite',250),(220,2,'suite',250)
+(217,2,'suite',80),(218,2,'suite',80),
+(219,2,'suite',80),(220,2,'suite',80)
 ON CONFLICT (numero) DO NOTHING;
 
 -- ══════════════════════════════════════════════════════════════
