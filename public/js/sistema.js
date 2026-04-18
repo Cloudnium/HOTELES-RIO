@@ -1125,17 +1125,21 @@ async function toggleProduct(id,estado){await sb.from('productos').update({activ
 //  CAJAS — con histórico por fecha y ticket de cierre
 // ══════════════════════════════════════════════════════════
 async function loadCajas(){
-  const hoy=new Date().toISOString().split('T')[0];
-  // Inicializar filtro de fecha si no tiene valor
-  const fecInput=document.getElementById('caja-hist-fecha');
-  if(fecInput&&!fecInput.value) fecInput.value=hoy;
-  const fechaFiltro=fecInput?.value||hoy;
-  document.getElementById('caja-fecha').textContent=fechaFiltro;
+  const hoy = fechaPeruHoy(); // ← siempre UTC-5 Perú, nunca new Date() directo
+  // Input fecha: sin restricciones, permite fechas anteriores
+  const fecInput = document.getElementById('caja-hist-fecha');
+  if(fecInput) {
+    fecInput.removeAttribute('min');   // ← quitar bloqueo de días pasados
+    fecInput.removeAttribute('max');   // ← quitar bloqueo de días futuros
+    if(!fecInput.value) fecInput.value = hoy;
+  }
+  const fechaFiltro = fecInput?.value || hoy;
+  document.getElementById('caja-fecha').textContent = fechaFiltro;
 
   const { data:cajas } = await sb.from('cajas').select('*, usuarios(nombre)').eq('fecha',fechaFiltro).order('created_at');
 
-  // Actualizar cajaActual si es hoy
-  if(fechaFiltro===hoy) cajaActual=cajas?.find(c=>c.usuario_id===currentUserProfile?.id&&c.estado==='abierta')||cajaActual||null;
+  // Comparar siempre con fechaPeruHoy() evaluado en el momento (no la variable capturada)
+  if(fechaFiltro === fechaPeruHoy()) cajaActual=cajas?.find(c=>c.usuario_id===currentUserProfile?.id&&c.estado==='abierta')||cajaActual||null;
 
   const grid=document.getElementById('cajas-grid');
   grid.innerHTML=cajas?.length
@@ -1146,7 +1150,7 @@ async function loadCajas(){
           <div class="caja-total">S/. ${(c.total||0).toFixed(2)}</div>
           <div class="caja-sub">Apertura: ${formatTime(c.created_at)}</div>
           <div class="caja-actions">
-            ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id&&fechaFiltro===hoy
+            ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id&&fechaFiltro===fechaPeruHoy()
               ?`<button class="sys-btn sys-btn-outline sys-btn-sm" onclick="cerrarCaja(${c.id})">Cerrar caja</button>`:''}
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="verDetalleCaja(${c.id})">Ver detalle</button>
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="imprimirCaja(${c.id})">🖨 Ticket</button>
@@ -1161,7 +1165,7 @@ async function loadCajas(){
   if(fecInput&&!fecInput._bound){fecInput._bound=true;fecInput.addEventListener('change',loadCajas);}
 
   // Mostrar movimientos de la caja activa del usuario para HOY
-  if(cajaActual&&fechaFiltro===hoy){
+  if(cajaActual&&fechaFiltro===fechaPeruHoy()){
     const { data:movs } = await sb.from('movimientos_caja').select('*').eq('caja_id',cajaActual.id).order('created_at',{ascending:false});
     const tbody=document.getElementById('caja-movimientos');
     tbody.innerHTML=movs?.length
@@ -1183,17 +1187,24 @@ async function imprimirCaja(cajaId){
   const { data:caja } = await sb.from('cajas').select('*, usuarios(nombre)').eq('id',cajaId).single();
   const { data:movs } = await sb.from('movimientos_caja').select('*').eq('caja_id',cajaId).order('created_at',{ascending:false});
 
-  // Calcular resumen por método de pago
-  const resumenMetodos={};
-  movs?.filter(m=>m.tipo==='ingreso').forEach(m=>{
-    // Extraer método del concepto
-    let met='Varios';
-    if(m.concepto?.includes('Efectivo')) met='Efectivo';
-    else if(m.concepto?.includes('Tarjeta')) met='Tarjeta';
-    else if(m.concepto?.includes('Yape')) met='Yape';
-    else if(m.concepto?.includes('Plin')) met='Plin';
-    resumenMetodos[met]=(resumenMetodos[met]||0)+(m.monto||0);
-  });
+// Calcular resumen por método de pago leyendo de comprobantes
+const resumenMetodos = {};
+const { data:compHAB } = await sb.from('comprobantes')
+  .select('metodo_pago, total')
+  .eq('caja_id', cajaId)
+  .eq('tipo_serie', 'HAB');
+compHAB?.forEach(c => {
+  const m = c.metodo_pago || 'Efectivo';
+  resumenMetodos[m] = (resumenMetodos[m]||0) + (c.total||0);
+});
+const { data:compPUB } = await sb.from('comprobantes')
+  .select('metodo_pago, total')
+  .eq('caja_id', cajaId)
+  .eq('tipo_serie', 'PUB');
+compPUB?.forEach(v => {
+  const m = v.metodo_pago || 'Efectivo';
+  resumenMetodos[m] = (resumenMetodos[m]||0) + (v.total||0);
+});
 
   const serie=await getSiguienteSerie('CAJA');
   // Cargar egresos del día para incluir en el ticket
@@ -1771,8 +1782,13 @@ document.getElementById('btn-guardar-metodo')?.addEventListener('click',async()=
   const modal=document.getElementById('modal-editar-metodo');
   const metodo=modal.querySelector('.metodo-btn.active')?.dataset.metodo;
   if(!metodo||!id) return;
-  // Also update datos_json so reprint shows updated method
-  const { data:comp } = await sb.from('comprobantes').select('datos_json').eq('id',id).single();
+
+  // 1. Leer el comprobante completo para saber tipo y referencias
+  const { data:comp } = await sb.from('comprobantes')
+    .select('datos_json, tipo_serie, check_in_id, venta_publica_id')
+    .eq('id',id).single();
+
+  // 2. Actualizar datos_json para que el ticket reimpreso salga correcto
   let updateData = { metodo_pago: metodo };
   if(comp?.datos_json) {
     try {
@@ -1782,7 +1798,19 @@ document.getElementById('btn-guardar-metodo')?.addEventListener('click',async()=
     } catch(e){}
   }
   await sb.from('comprobantes').update(updateData).eq('id',id);
-  showToast('Método de pago actualizado ✓','ok'); closeModal('modal-editar-metodo'); loadComprobantes();
+
+  // 3. Actualizar la tabla de origen para que reportes refleje el cambio
+  //    - HAB → check_ins.metodo_pago
+  //    - PUB → ventas_publicas.metodo_pago
+  if(comp?.tipo_serie==='HAB' && comp?.check_in_id) {
+    await sb.from('check_ins').update({metodo_pago: metodo}).eq('id', comp.check_in_id);
+  } else if(comp?.tipo_serie==='PUB' && comp?.venta_publica_id) {
+    await sb.from('ventas_publicas').update({metodo_pago: metodo}).eq('id', comp.venta_publica_id);
+  }
+
+  showToast('Método de pago actualizado ✓ (visible en reportes y ticket)','ok');
+  closeModal('modal-editar-metodo');
+  loadComprobantes();
 });
 
 // ══════════════════════════════════════════════════════════
