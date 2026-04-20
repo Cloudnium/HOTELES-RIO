@@ -1,7 +1,7 @@
 // ============================================================
 //  sistema.js — Sistema de Gestión Interna Hoteles Rio v5
 // ============================================================
-
+//  Desarrollado por Cloudnium
 const SUPABASE_URL      = 'https://xeuugehcomgmkczzheno.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhldXVnZWhjb21nbWtjenpoZW5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTU5NjgsImV4cCI6MjA5MjA5MTk2OH0.9wJFk8s5cBjNBIXhZnzCXm9Sqz2qziWRdBLiNey3lZU';
 
