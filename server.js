@@ -2,6 +2,7 @@
 //  server.js — Servidor principal de Hoteles Rio
 //  Para iniciar: npm start   (o npm run dev para desarrollo)
 // ============================================================
+//  Desarrollado por Cloudnium
 
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
