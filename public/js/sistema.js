@@ -51,6 +51,12 @@ function fechaPeruHoy() {
   const local = new Date(now.getTime() + (-5*60 - now.getTimezoneOffset()) * 60000);
   return local.toISOString().substring(0, 10);
 }
+function peruDesdeTS(fecha) {
+  return fecha + 'T00:00:00-05:00';
+}
+function peruHastaTS(fecha) {
+  return fecha + 'T23:59:59-05:00';
+}
 function ahoraPeruISO() {
   const now = new Date();
   return new Date(now.getTime() + (-5*60 - now.getTimezoneOffset()) * 60000).toISOString();
@@ -1257,8 +1263,8 @@ async function generarReporte(){
   const desde = document.getElementById('reporte-desde')?.value;
   const hasta  = document.getElementById('reporte-hasta')?.value;
   if(!desde||!hasta){ showToast('Selecciona el rango de fechas','err'); return; }
-  const desdeTS = desde+'T00:00:00';
-  const hastaTS  = hasta+'T23:59:59';
+  const desdeTS = peruDesdeTS(desde);
+  const hastaTS  = peruHastaTS(hasta);
 
   // Helper seguro para queries que pueden fallar (tabla no existe, etc)
   async function safeQuery(queryFn) {
@@ -1424,8 +1430,10 @@ async function loadComprobantes(){
   await filtrarComprobantes();
 }
 async function filtrarComprobantes(){
-  const desde=(document.getElementById('filter-comp-desde')?.value||new Date().toISOString().split('T')[0])+'T00:00:00';
-  const hasta=(document.getElementById('filter-comp-hasta')?.value||new Date().toISOString().split('T')[0])+'T23:59:59';
+  const desdeFecha = document.getElementById('filter-comp-desde')?.value || fechaPeruHoy();
+  const hastaFecha = document.getElementById('filter-comp-hasta')?.value || fechaPeruHoy();
+  const desde = peruDesdeTS(desdeFecha);
+  const hasta  = peruHastaTS(hastaFecha);
   const tipo=document.getElementById('filter-comp-tipo')?.value||'';
   const q=document.getElementById('search-comprobante')?.value.trim()||'';
   let query=sb.from('comprobantes').select('*, usuarios(nombre)').gte('created_at',desde).lte('created_at',hasta).order('created_at',{ascending:false});
