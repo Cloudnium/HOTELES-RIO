@@ -46,14 +46,14 @@
 ══════════════════════════════════════════════════════════ */
 .login-screen {
   min-height:100vh; display:flex; align-items:center; justify-content:center;
-  background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 50%, #6d28d9 100%);
+  background: linear-gradient(135deg, #fdfaf6 0%, #f5efe6 50%, #ede6dc 100%);
   position:relative; overflow:hidden; padding:40px 20px;
   margin-top: calc(-1 * var(--nav-height, 76px));
 }
 .login-screen::before {
   content:''; position:absolute; inset:0;
-  background: radial-gradient(ellipse at 20% 20%, rgba(236,72,153,.12) 0%,transparent 60%),
-              radial-gradient(ellipse at 80% 80%, rgba(124,58,237,.15) 0%,transparent 50%);
+  background: radial-gradient(ellipse at 20% 20%, rgba(255, 200, 150, .15) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 80%, rgba(200, 180, 150, .15) 0%, transparent 50%);
 }
 .login-screen::after {
   content:''; position:absolute; width:600px; height:600px;

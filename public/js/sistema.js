@@ -429,10 +429,12 @@ function badgeColor(e){return{disponible:'verde',ocupado:'rojo',limpieza:'celest
 function openCheckinModal(room) {
   document.getElementById('ci-hab-num').textContent=String(room.numero).padStart(3,'0');
   document.getElementById('ci-precio').value=room.precio_noche||'';
-  const today=new Date().toISOString().split('T')[0];
-  const manana=new Date(); manana.setDate(manana.getDate()+1);
+  const today = fechaPeruHoy();
+  const mananaDate = new Date(today + 'T12:00:00');
+  mananaDate.setDate(mananaDate.getDate()+1);
+  const manana = mananaDate.toISOString().split('T')[0];
   document.getElementById('ci-entrada').value=today;
-  document.getElementById('ci-salida').value=manana.toISOString().split('T')[0];
+  document.getElementById('ci-salida').value=manana;
   document.getElementById('btn-confirmar-checkin').onclick=()=>confirmarCheckin(room.id);
   openModal('modal-checkin');
 }
