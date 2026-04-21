@@ -377,3 +377,13 @@ CREATE TABLE IF NOT EXISTS egresos (
 );
 ALTER TABLE egresos ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "auth_all_egresos" ON egresos FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ══════════════════════════════════════════════════════════
+--  ACTUALIZACIÓN v9 — Ejecutar en Supabase SQL Editor
+-- ══════════════════════════════════════════════════════════
+-- Añadir columnas hora_apertura y hora_cierre a tabla cajas
+-- (para turno noche que pasa de un día a otro)
+ALTER TABLE cajas ADD COLUMN IF NOT EXISTS hora_apertura TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE cajas ADD COLUMN IF NOT EXISTS hora_cierre   TIMESTAMPTZ;
+-- Rellenar hora_apertura con created_at para registros existentes
+UPDATE cajas SET hora_apertura = created_at WHERE hora_apertura IS NULL;

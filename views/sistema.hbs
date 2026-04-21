@@ -456,6 +456,30 @@
               <tbody id="reporte-checkins"><tr><td colspan="10" class="empty-row">Cargando...</td></tr></tbody>
             </table></div>
           </div>
+
+          <!-- Top 5 productos -->
+          <div class="sys-card" id="card-top5" style="display:none">
+            <div class="sys-card-head">
+              <h3><i class="fas fa-trophy" style="color:#f59e0b;margin-right:6px"></i>Top 5 productos más vendidos</h3>
+              <span id="top5-periodo" class="rep-periodo-label"></span>
+            </div>
+            <div class="top5-layout">
+              <!-- Gráfico donut -->
+              <div class="top5-chart-wrap">
+                <canvas id="top5-canvas" width="260" height="260"></canvas>
+                <div id="top5-tooltip" class="top5-tooltip" style="display:none"></div>
+              </div>
+              <!-- Leyenda + tabla -->
+              <div class="top5-legend-wrap">
+                <div id="top5-legend" class="top5-legend"></div>
+                <table class="top5-table">
+                  <thead><tr><th>Producto</th><th>Qty</th><th>Total</th></tr></thead>
+                  <tbody id="top5-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
         </section>
 
         <!-- ═══ COMPROBANTES ═══ -->
@@ -876,6 +900,27 @@
         <button class="sys-btn sys-btn-outline" data-modal="modal-egreso">Cancelar</button>
         <button class="sys-btn sys-btn-red" id="btn-guardar-egreso"><i class="fas fa-save"></i> Guardar egreso</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal alerta stock bajo -->
+<div id="modal-stock-alert" class="sys-modal" style="display:none">
+  <div class="sys-modal-box stock-alert-box">
+    <div class="stock-alert-header">
+      <span class="stock-alert-icon-title">
+        <i class="fas fa-bullhorn"></i> Alerta
+      </span>
+    </div>
+    <div class="sys-modal-body stock-alert-body">
+      <h2 class="stock-alert-title">¡Productos en inventario<br>por debajo del stock óptimo!</h2>
+      <div class="stock-alert-shelf">
+       <img src="/images/not-available.gif" alt="Sin stock" class="stock-alert-gif">
+      </div>
+      <div id="stock-alert-list" class="stock-alert-list"></div>
+      <button class="stock-alert-btn" onclick="irAlAlmacen()">
+        Ver productos y abastecer <i class="fas fa-search"></i>
+      </button>
     </div>
   </div>
 </div>

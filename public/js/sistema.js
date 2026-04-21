@@ -134,14 +134,19 @@ async function handleLogin(user) {
   showDashboard();
   loadSection('habitaciones');
   initNotificaciones();
+  // Verificar stock bajo al entrar al sistema
+  setTimeout(checkStockAlert, 1200);
 }
 
 // Recuperar caja activa persistida
 async function recuperarCajaActiva() {
-  const hoy = fechaPeruHoy();
+  // Buscar caja abierta del usuario SIN filtrar por fecha
+  // Así el cajero de turno noche sigue con su caja aunque sea otro día
   const { data:cajas } = await sb.from('cajas')
-    .select('*').eq('fecha', hoy).eq('estado', 'abierta')
-    .eq('usuario_id', currentUserProfile.id);
+    .select('*').eq('estado', 'abierta')
+    .eq('usuario_id', currentUserProfile.id)
+    .order('created_at', {ascending: false})
+    .limit(1);
   cajaActual = cajas?.[0] || null;
 }
 
@@ -768,7 +773,9 @@ function imprimirTicketCaja(d) {
     <table>
       <tr><td class="b">Caja:</td><td class="r">${d.caja}</td></tr>
       <tr><td class="b">Usuario:</td><td class="r">${d.usuario}</td></tr>
-      <tr><td class="b">Fecha:</td><td class="r">${d.fecha}</td></tr>
+      <tr><td class="b">Fecha apertura:</td><td class="r">${d.fecha}</td></tr>
+      <tr><td class="b">Hora apertura:</td><td class="r">${d.horaApertura}</td></tr>
+      ${d.horaCierre?`<tr><td class="b">Hora cierre:</td><td class="r">${d.horaCierre}</td></tr>`:''}
       <tr><td class="b">Estado:</td><td class="r">${d.estado}</td></tr>
     </table>
     <div class="ln"></div>
@@ -1144,6 +1151,8 @@ async function loadCajas(){
   const fechaFiltro = fecInput?.value || hoy;
   document.getElementById('caja-fecha').textContent = fechaFiltro;
 
+  // Buscar por fecha de APERTURA (campo 'fecha') — muestra aunque hayan
+  // cerrado al día siguiente (turno noche)
   const { data:cajas } = await sb.from('cajas').select('*, usuarios(nombre)').eq('fecha',fechaFiltro).order('created_at');
 
   // Comparar siempre con fechaPeruHoy() evaluado en el momento (no la variable capturada)
@@ -1154,11 +1163,14 @@ async function loadCajas(){
     ?cajas.map(c=>`
         <div class="caja-card ${c.estado==='abierta'?'caja-abierta':'caja-cerrada'}">
           <h4>${c.usuarios?.nombre||'—'}</h4>
-          <div class="caja-user">📅 ${c.fecha} | ${c.estado}</div>
+          <div class="caja-user">📅 Abierta el ${c.fecha} | <span class="badge ${c.estado==='abierta'?'badge-verde':'badge-rojo'}">${c.estado}</span></div>
           <div class="caja-total">S/. ${(c.total||0).toFixed(2)}</div>
-          <div class="caja-sub">Apertura: ${formatTime(c.created_at)}</div>
+          <div class="caja-sub">
+            🟢 Apertura: ${formatTime(c.hora_apertura||c.created_at)}
+            ${c.hora_cierre?`&nbsp;|&nbsp;🔴 Cierre: ${formatTime(c.hora_cierre)}`:''}
+          </div>
           <div class="caja-actions">
-            ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id&&fechaFiltro===fechaPeruHoy()
+            ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id
               ?`<button class="sys-btn sys-btn-outline sys-btn-sm" onclick="cerrarCaja(${c.id})">Cerrar caja</button>`:''}
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="verDetalleCaja(${c.id})">Ver detalle</button>
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="imprimirCaja(${c.id})">🖨 Ticket</button>
@@ -1172,8 +1184,8 @@ async function loadCajas(){
   // Bind filtro fecha
   if(fecInput&&!fecInput._bound){fecInput._bound=true;fecInput.addEventListener('change',loadCajas);}
 
-  // Mostrar movimientos de la caja activa del usuario para HOY
-  if(cajaActual&&fechaFiltro===fechaPeruHoy()){
+  // Mostrar movimientos de la caja activa del usuario (sin importar el día)
+  if(cajaActual){
     const { data:movs } = await sb.from('movimientos_caja').select('*').eq('caja_id',cajaActual.id).order('created_at',{ascending:false});
     const tbody=document.getElementById('caja-movimientos');
     tbody.innerHTML=movs?.length
@@ -1222,9 +1234,16 @@ compPUB?.forEach(v => {
     const { data:egresosTicket } = await sb.from('egresos').select('monto').eq('fecha', caja?.fecha||fechaPeruHoy());
     totalEgresos = (egresosTicket||[]).reduce((s,e)=>s+(e.monto||0), 0);
   } catch(e) { console.warn('No se pudo cargar egresos:', e); }
+  const horaApertura = caja?.hora_apertura
+    ? new Date(caja.hora_apertura).toLocaleString('es-PE',{hour:'2-digit',minute:'2-digit',hour12:true,day:'2-digit',month:'2-digit',year:'numeric'})
+    : formatTime(caja?.created_at);
+  const horaCierre = caja?.hora_cierre
+    ? new Date(caja.hora_cierre).toLocaleString('es-PE',{hour:'2-digit',minute:'2-digit',hour12:true,day:'2-digit',month:'2-digit',year:'numeric'})
+    : null;
   const datosTicket={
     serie, caja:`#${cajaId}`, usuario:caja?.usuarios?.nombre||'—',
     fecha:caja?.fecha, estado:caja?.estado,
+    horaApertura, horaCierre,
     movimientos:movs||[], resumenMetodos, totalGeneral:caja?.total||0, totalEgresos
   };
   await registrarComprobante({serie,tipo:'CAJA',descripcion:`Resumen caja #${cajaId}`,cliente:'—',total:caja?.total||0,metodo_pago:'Varios',datos_json:datosTicket});
@@ -1233,12 +1252,22 @@ compPUB?.forEach(v => {
 
 async function abrirCaja(){
   if(cajaActual){showToast('Ya tienes una caja abierta','err');return;}
-  const hoy=fechaPeruHoy();
-  const { data } = await sb.from('cajas').insert({usuario_id:currentUserProfile?.id,fecha:hoy,estado:'abierta',total:0}).select().single();
+  const hoy = fechaPeruHoy(); // fecha en que ABRE (puede ser diferente a cuando cierra)
+  const { data } = await sb.from('cajas').insert({
+    usuario_id: currentUserProfile?.id,
+    fecha: hoy,
+    estado: 'abierta',
+    total: 0,
+    hora_apertura: new Date().toISOString() // timestamp exacto de apertura
+  }).select().single();
   cajaActual=data; actualizarCajaStatus(); showToast('✅ Caja abierta','ok'); loadCajas();
 }
 async function cerrarCaja(id){
-  await sb.from('cajas').update({estado:'cerrada'}).eq('id',id);
+  // Guardar hora exacta de cierre — sin importar si ya es otro día (turno noche)
+  await sb.from('cajas').update({
+    estado: 'cerrada',
+    hora_cierre: new Date().toISOString()
+  }).eq('id',id);
   if(cajaActual?.id===id) cajaActual=null;
   actualizarCajaStatus(); showToast('Caja cerrada ✓','ok'); loadCajas();
 }
@@ -1389,6 +1418,9 @@ async function generarReporte(){
           <td><strong>S/. ${p.total.toFixed(2)}</strong></td>
         </tr>`).join('')
     : '<tr><td colspan="3" class="empty-row">Sin ventas en tienda pública</td></tr>';
+
+  // ── Top 5 productos — gráfico donut ──
+  renderTop5(Object.values(groupPub), desde, hasta);
 
   // ── Tabla: detalle check-outs ──
   const tbCo = document.getElementById('reporte-checkins');
@@ -2161,4 +2193,259 @@ async function descargarReportePDF() {
   win.document.write(html);
   win.document.close();
   setTimeout(()=> win.focus(), 300);
+}
+
+
+// ══════════════════════════════════════════════════════════
+//  ALERTA DE STOCK BAJO AL LOGIN
+// ══════════════════════════════════════════════════════════
+async function checkStockAlert() {
+  try {
+    const { data:prods } = await sb.from('productos')
+      .select('nombre, stock, stock_minimo')
+      .eq('activo', true)
+      .order('stock', {ascending: true});
+
+    if(!prods?.length) return;
+
+    // Productos con stock <= stock_minimo (o <= 5 si no tiene definido)
+    const bajos = prods.filter(p => (p.stock||0) <= (p.stock_minimo||5));
+    if(!bajos.length) return;
+
+    // Llenar lista de productos
+    const lista = document.getElementById('stock-alert-list');
+    if(lista) {
+      lista.innerHTML = bajos.slice(0,8).map(p=>
+        `<div class="stock-alert-item">
+          <span class="stock-alert-prod">${p.nombre}</span>
+          <span class="stock-alert-qty ${p.stock<=0?'sin-stock':'stock-bajo'}">
+            ${p.stock<=0?'Sin stock':'Stock: '+p.stock+' (mín '+( p.stock_minimo||5)+')'}
+          </span>
+        </div>`
+      ).join('') + (bajos.length>8?`<div class="stock-alert-more">...y ${bajos.length-8} productos más</div>`:'');
+    }
+
+    openModal('modal-stock-alert');
+  } catch(e) {
+    console.warn('No se pudo verificar stock:', e);
+  }
+}
+
+function irAlAlmacen() {
+  closeModal('modal-stock-alert');
+  loadSection('almacen');
+  // Activar nav item de almacén
+  document.querySelectorAll('.sys-nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelector('[data-sec="almacen"]')?.classList.add('active');
+}
+
+// ══════════════════════════════════════════════════════════
+//  TOP 5 PRODUCTOS — GRÁFICO DONUT
+// ══════════════════════════════════════════════════════════
+const TOP5_COLORS = [
+  '#a78bfa','#6ee7b7','#7dd3fc','#f9a8d4','#fcd34d',
+  '#c4b5fd','#34d399','#38bdf8','#f472b6','#fbbf24'
+];
+
+function renderTop5(productos, desde, hasta) {
+  const card = document.getElementById('card-top5');
+  if(!card) return;
+
+  // Ordenar y tomar top 5
+  const top5 = productos
+    .filter(p => p.total > 0)
+    .sort((a,b) => b.total - a.total)
+    .slice(0, 5);
+
+  if(!top5.length) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+
+  // Periodo label
+  const lbl = document.getElementById('top5-periodo');
+  if(lbl) lbl.textContent = `${formatDate(desde)} — ${formatDate(hasta)}`;
+
+  const totalVentas = top5.reduce((s,p) => s + p.total, 0);
+
+  // ── Tabla ──
+  const tbody = document.getElementById('top5-tbody');
+  if(tbody) tbody.innerHTML = top5.map((p,i) => `
+    <tr>
+      <td>
+        <span class="top5-dot" style="background:${TOP5_COLORS[i]}"></span>
+        ${p.nombre}
+      </td>
+      <td>${p.cantidad}</td>
+      <td><strong>S/. ${p.total.toFixed(2)}</strong></td>
+    </tr>`).join('');
+
+  // ── Leyenda ──
+  const legend = document.getElementById('top5-legend');
+  if(legend) legend.innerHTML = top5.map((p,i) => `
+    <div class="top5-legend-item">
+      <span class="top5-dot" style="background:${TOP5_COLORS[i]}"></span>
+      <span class="top5-legend-name">${p.nombre}</span>
+      <span class="top5-legend-pct">${((p.total/totalVentas)*100).toFixed(1)}%</span>
+    </div>`).join('');
+
+  // ── Canvas donut ──
+  dibujarDonut(top5, totalVentas);
+}
+
+function dibujarDonut(top5, totalVentas) {
+  const canvas = document.getElementById('top5-canvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2;
+  const R = Math.min(W,H)/2 - 10;  // radio externo
+  const r = R * 0.52;               // radio interno (hueco del donut)
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Calcular ángulos
+  const segmentos = [];
+  let startAngle = -Math.PI / 2; // empezar arriba
+  top5.forEach((p, i) => {
+    const pct = p.total / totalVentas;
+    const endAngle = startAngle + pct * 2 * Math.PI;
+    segmentos.push({ p, i, startAngle, endAngle, pct });
+    startAngle = endAngle;
+  });
+
+  // Guardar segmentos para hover
+  canvas._segmentos = segmentos;
+  canvas._R = R; canvas._r = r; canvas._cx = cx; canvas._cy = cy;
+  canvas._totalVentas = totalVentas;
+
+  // Dibujar segmentos
+  segmentos.forEach(seg => dibujarSegmento(ctx, seg, R, r, cx, cy, false));
+
+  // Texto central
+  ctx.fillStyle = '#1e1b4b';
+  ctx.font = 'bold 13px Inter, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('S/. ' + totalVentas.toFixed(0), cx, cy - 8);
+  ctx.font = '10px Inter, Arial, sans-serif';
+  ctx.fillStyle = '#6b7280';
+  ctx.fillText('total', cx, cy + 10);
+
+  // Hover events
+  if(!canvas._hoverBound) {
+    canvas._hoverBound = true;
+
+    canvas.addEventListener('mousemove', function(e) {
+      const rect = canvas.getBoundingClientRect();
+      // Escalar coordenadas según tamaño CSS vs canvas interno
+      const scaleX = canvas.width  / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top)  * scaleY;
+
+      const { _segmentos:segs, _R:Ro, _r:ri, _cx:ox, _cy:oy } = canvas;
+      const dx = mx - ox, dy = my - oy;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const tooltip = document.getElementById('top5-tooltip');
+
+      if(dist >= ri && dist <= Ro) {
+        let ang = Math.atan2(dy, dx);
+        if(ang < -Math.PI/2) ang += 2*Math.PI; // normalizar al rango del donut
+
+        const seg = segs.find(s => ang >= s.startAngle && ang < s.endAngle);
+        if(seg) {
+          // Redibujar
+          ctx.clearRect(0,0,W,H);
+          segs.forEach(s => dibujarSegmento(ctx, s, Ro, ri, ox, oy, s===seg));
+          // Texto central con el producto activo
+          ctx.fillStyle = '#1e1b4b';
+          ctx.font = 'bold 12px Inter, Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('S/. '+seg.p.total.toFixed(2), ox, oy-8);
+          ctx.font = '9px Inter, Arial, sans-serif';
+          ctx.fillStyle = '#6b7280';
+          const shortName = seg.p.nombre.length>14 ? seg.p.nombre.substring(0,14)+'…' : seg.p.nombre;
+          ctx.fillText(shortName, ox, oy+8);
+
+          // Tooltip flotante
+          if(tooltip) {
+            tooltip.style.display = 'block';
+            tooltip.innerHTML = `<strong>${seg.p.nombre}</strong><br>
+              S/. ${seg.p.total.toFixed(2)} &nbsp;|&nbsp; ${(seg.pct*100).toFixed(1)}%<br>
+              <small>${seg.p.cantidad} unidades</small>`;
+            // Posición relativa al contenedor
+            const wrap = canvas.parentElement;
+            const wRect = wrap.getBoundingClientRect();
+            let tx = e.clientX - wRect.left + 12;
+            let ty = e.clientY - wRect.top  - 10;
+            if(tx + 160 > wRect.width) tx = e.clientX - wRect.left - 170;
+            tooltip.style.left = tx + 'px';
+            tooltip.style.top  = ty + 'px';
+          }
+          return;
+        }
+      }
+      // Fuera del donut: restaurar
+      ctx.clearRect(0,0,W,H);
+      segs.forEach(s => dibujarSegmento(ctx, s, Ro, ri, ox, oy, false));
+      ctx.fillStyle = '#1e1b4b';
+      ctx.font = 'bold 13px Inter, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('S/. '+canvas._totalVentas.toFixed(0), ox, oy-8);
+      ctx.font = '10px Inter, Arial, sans-serif';
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText('total', ox, oy+10);
+      if(tooltip) tooltip.style.display = 'none';
+    });
+
+    canvas.addEventListener('mouseleave', function() {
+      const { _segmentos:segs, _R:Ro, _r:ri, _cx:ox, _cy:oy } = canvas;
+      ctx.clearRect(0,0,W,H);
+      segs.forEach(s => dibujarSegmento(ctx, s, Ro, ri, ox, oy, false));
+      ctx.fillStyle = '#1e1b4b';
+      ctx.font = 'bold 13px Inter, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('S/. '+canvas._totalVentas.toFixed(0), ox, oy-8);
+      ctx.font = '10px Inter, Arial, sans-serif';
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText('total', ox, oy+10);
+      const tooltip = document.getElementById('top5-tooltip');
+      if(tooltip) tooltip.style.display = 'none';
+    });
+  }
+}
+
+function dibujarSegmento(ctx, seg, R, r, cx, cy, activo) {
+  const gap = 0.015; // pequeño hueco entre segmentos
+  const sa = seg.startAngle + gap;
+  const ea = seg.endAngle   - gap;
+  const scale = activo ? 1.05 : 1;
+
+  ctx.save();
+  if(activo) {
+    // Efecto "saltar" hacia afuera
+    const midAng = (seg.startAngle + seg.endAngle) / 2;
+    ctx.translate(Math.cos(midAng)*6, Math.sin(midAng)*6);
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(cx + r*Math.cos(sa), cy + r*Math.sin(sa));
+  ctx.arc(cx, cy, R*scale, sa, ea);
+  ctx.arc(cx, cy, r,       ea, sa, true);
+  ctx.closePath();
+
+  ctx.fillStyle = TOP5_COLORS[seg.i];
+  ctx.fill();
+
+  // Borde sutil
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.restore();
 }
