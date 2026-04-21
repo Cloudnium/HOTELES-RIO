@@ -1172,7 +1172,7 @@ async function loadCajas(){
           <div class="caja-actions">
             ${c.estado==='abierta'&&c.usuario_id===currentUserProfile?.id
               ?`<button class="sys-btn sys-btn-outline sys-btn-sm" onclick="cerrarCaja(${c.id})">Cerrar caja</button>`:''}
-            <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="verDetalleCaja(${c.id})">Ver detalle</button>
+            <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="abrirDetalleCaja(${c.id})">Ver detalle</button>
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="imprimirCaja(${c.id})">🖨 Ticket</button>
           </div>
         </div>`).join('')
@@ -1309,7 +1309,7 @@ async function generarReporte(){
   }
 
   // Cargar todos los datos — cada uno de forma segura e independiente
-  const [checkins, ventasPub, habitaciones, reservasPeriodo, egresosData] = await Promise.all([
+  const [checkins, ventasPub, habitaciones, reservasPeriodo, egresosData, consumosHabData] = await Promise.all([
     safeQuery(()=> sb.from('check_ins')
       .select('*, habitaciones(numero,categoria)')
       .gte('check_in_fecha', desde)
@@ -1327,6 +1327,10 @@ async function generarReporte(){
       .order('fecha_reserva', {ascending:false})),
     safeQuery(()=> sb.from('egresos')
       .select('monto')
+      .gte('created_at', desdeTS)
+      .lte('created_at', hastaTS)),
+    safeQuery(()=> sb.from('consumos_habitacion')
+      .select('*, productos(nombre)')
       .gte('created_at', desdeTS)
       .lte('created_at', hastaTS)),
   ]);
@@ -1419,8 +1423,20 @@ async function generarReporte(){
         </tr>`).join('')
     : '<tr><td colspan="3" class="empty-row">Sin ventas en tienda pública</td></tr>';
 
-  // ── Top 5 productos — gráfico donut ──
-  renderTop5(Object.values(groupPub), desde, hasta);
+  // ── Combinar productos de tienda pública + tienda x habitación ──
+  const groupAll = { ...groupPub }; // copia de tienda pública
+  consumosHabData.forEach(c => {
+    const nombre = c.productos?.nombre || 'Desconocido';
+    if(!groupAll[nombre]) groupAll[nombre] = { nombre, cantidad:0, total:0 };
+    groupAll[nombre].cantidad += Number(c.cantidad)||0;
+    groupAll[nombre].total    += Number(c.precio_total)||0;
+  });
+
+  // ── Top 5 productos — gráfico donut (todas las ventas) ──
+  renderTop5(Object.values(groupAll), desde, hasta);
+
+  // ── Top habitaciones más usadas ──
+  renderTopHabs(Object.values(groupHab), desde, hasta);
 
   // ── Tabla: detalle check-outs ──
   const tbCo = document.getElementById('reporte-checkins');
@@ -2447,5 +2463,302 @@ function dibujarSegmento(ctx, seg, R, r, cx, cy, activo) {
   ctx.lineWidth = 2;
   ctx.stroke();
 
+  ctx.restore();
+}
+
+// ══════════════════════════════════════════════════════════
+//  DETALLE DE CAJA — MODAL RESUMEN ESTILO IMAGEN
+// ══════════════════════════════════════════════════════════
+let _cajaDetalleId = null;
+
+async function abrirDetalleCaja(cajaId) {
+  _cajaDetalleId = cajaId;
+
+  const [
+    { data:caja },
+    { data:movs },
+    { data:compHAB },
+    { data:compPUB }
+  ] = await Promise.all([
+    sb.from('cajas').select('*, usuarios(nombre)').eq('id',cajaId).single(),
+    sb.from('movimientos_caja').select('*').eq('caja_id',cajaId).order('created_at',{ascending:false}),
+    sb.from('comprobantes').select('metodo_pago,total').eq('caja_id',cajaId).eq('tipo_serie','HAB'),
+    sb.from('comprobantes').select('metodo_pago,total').eq('caja_id',cajaId).eq('tipo_serie','PUB'),
+  ]);
+
+  // Egresos del día
+  let totalEgresos = 0;
+  try {
+    const { data:egr } = await sb.from('egresos').select('monto').eq('fecha', caja?.fecha||fechaPeruHoy());
+    totalEgresos = (egr||[]).reduce((s,e)=>s+(e.monto||0),0);
+  } catch(_){}
+
+  // Calcular totales por categoría
+  const totalHospedaje = (compHAB||[]).reduce((s,c)=>s+(c.total||0),0);
+  // Consumos de habitacion = movimientos tipo ingreso que contienen "consumo" o "Consumo"
+  const totalServHab = movs?.filter(m=>m.tipo==='ingreso'&&m.concepto?.toLowerCase().includes('consumo'))
+    .reduce((s,m)=>s+(m.monto||0),0)||0;
+  const totalVentasDir = (compPUB||[]).reduce((s,c)=>s+(c.total||0),0);
+  // Otros ingresos = ingresos que no son checkout ni consumo
+  const totalOtros = movs?.filter(m=>m.tipo==='ingreso'
+    &&!m.concepto?.toLowerCase().includes('check-out')
+    &&!m.concepto?.toLowerCase().includes('consumo'))
+    .reduce((s,m)=>s+(m.monto||0),0)||0;
+
+  const totalGeneral = (caja?.total||0);
+  const totalSinApertura = totalGeneral; // monto apertura = 0 en este sistema
+
+  // Resumen por método de pago
+  const mMap = {};
+  (compHAB||[]).forEach(c=>{ const m=c.metodo_pago||'Efectivo'; mMap[m]=(mMap[m]||0)+(c.total||0); });
+  (compPUB||[]).forEach(c=>{ const m=c.metodo_pago||'Efectivo'; mMap[m]=(mMap[m]||0)+(c.total||0); });
+
+  // Fechas/horas
+  const fmtDT = ts => ts
+    ? new Date(ts).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})
+    : '—';
+  const horaAp = fmtDT(caja?.hora_apertura||caja?.created_at);
+  const horaCi = caja?.hora_cierre ? fmtDT(caja.hora_cierre) : 'Aún abierta';
+
+  // Render del resumen
+  document.getElementById('mcd-titulo').textContent =
+    `#${cajaId} — ${caja?.usuarios?.nombre||'—'} (${caja?.estado||'—'})`;
+
+  document.getElementById('mcd-resumen').innerHTML = `
+    <div class="mcd-fechas">
+      <div><i class="fas fa-door-open" style="color:#22c55e"></i> Fecha Apertura: <strong>${horaAp}</strong></div>
+      ${caja?.hora_cierre?`<div><i class="fas fa-door-closed" style="color:#ef4444"></i> Fecha Cierre: <strong>${horaCi}</strong></div>`:''}
+    </div>
+    <div class="mcd-categorias">
+      <div class="mcd-cat-row">
+        <span><i class="fas fa-bed"></i> Hospedaje:</span>
+        <span>S/${totalHospedaje.toFixed(2)}</span>
+      </div>
+      <div class="mcd-cat-row">
+        <span><i class="fas fa-concierge-bell"></i> Servicio hab:</span>
+        <span>S/${totalServHab.toFixed(2)}</span>
+      </div>
+      <div class="mcd-cat-row">
+        <span><i class="fas fa-shopping-cart"></i> Ventas Directas:</span>
+        <span>S/${totalVentasDir.toFixed(2)}</span>
+      </div>
+      <div class="mcd-cat-row">
+        <span><i class="fas fa-plus-circle"></i> Otros Ingresos:</span>
+        <span>S/${totalOtros.toFixed(2)}</span>
+      </div>
+      <div class="mcd-cat-row mcd-egreso-row">
+        <span><i class="fas fa-minus-circle"></i> Egresos:</span>
+        <span>S/${totalEgresos.toFixed(2)}</span>
+      </div>
+    </div>
+    <div class="mcd-divider"></div>
+    <div class="mcd-total-row">
+      <span>Total:</span>
+      <span>S/${totalGeneral.toFixed(2)}</span>
+    </div>
+    <div class="mcd-total-row mcd-total-destacado">
+      <span>Total sin apertura:</span>
+      <span class="mcd-total-verde">S/${totalSinApertura.toFixed(2)}</span>
+    </div>
+    <div class="mcd-subtotal-note">Crédito y Cortesía no contable. (n/c)</div>
+    <div class="mcd-metodos">
+      ${Object.entries(mMap).map(([met,monto])=>`
+        <div class="mcd-metodo-row">
+          <span>${met}:</span>
+          <span>S/${monto.toFixed(2)}</span>
+        </div>`).join('')}
+      ${Object.keys(mMap).length===0?'<div class="mcd-metodo-row"><span>Sin ventas registradas</span><span>—</span></div>':''}
+    </div>`;
+
+  // Movimientos en tabla
+  document.getElementById('mcd-movimientos').innerHTML = movs?.length
+    ? movs.map(m=>`
+        <tr>
+          <td>${formatTime(m.created_at)}</td>
+          <td style="font-size:12px">${m.concepto||'—'}</td>
+          <td><span class="badge ${m.tipo==='ingreso'?'badge-verde':'badge-rojo'}">${m.tipo}</span></td>
+          <td>S/. ${(m.monto||0).toFixed(2)}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="4" class="empty-row">Sin movimientos</td></tr>';
+
+  // Botón imprimir
+  const btnT = document.getElementById('mcd-btn-ticket');
+  if(btnT) btnT.onclick = () => imprimirCaja(cajaId);
+
+  // También actualizar la tabla de movimientos en la sección principal
+  const tbody = document.getElementById('caja-movimientos');
+  if(tbody) tbody.innerHTML = movs?.length
+    ? movs.map(m=>`<tr><td>${formatTime(m.created_at)}</td><td>${m.concepto}</td><td><span class="badge ${m.tipo==='ingreso'?'badge-verde':'badge-rojo'}">${m.tipo}</span></td><td>S/. ${m.monto?.toFixed(2)}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="empty-row">Sin movimientos</td></tr>';
+
+  openModal('modal-caja-detalle');
+}
+
+// ══════════════════════════════════════════════════════════
+//  TOP HABITACIONES — GRÁFICO DONUT
+// ══════════════════════════════════════════════════════════
+const TOPHABS_COLORS = [
+  '#818cf8','#34d399','#fb923c','#f472b6','#38bdf8',
+  '#a78bfa','#6ee7b7','#fcd34d','#f9a8d4','#7dd3fc'
+];
+
+function renderTopHabs(habitaciones, desde, hasta) {
+  const card = document.getElementById('card-top-habs');
+  if(!card) return;
+
+  // Ordenar por usos (o total) y tomar top 5
+  const topH = habitaciones
+    .filter(h => h.usos > 0)
+    .sort((a,b) => b.usos - a.usos)
+    .slice(0, 5);
+
+  if(!topH.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const lbl = document.getElementById('tophabs-periodo');
+  if(lbl) lbl.textContent = `${formatDate(desde)} — ${formatDate(hasta)}`;
+
+  const totalUsos = topH.reduce((s,h)=>s+h.usos, 0);
+
+  // Tabla
+  const tbody = document.getElementById('tophabs-tbody');
+  if(tbody) tbody.innerHTML = topH.map((h,i)=>`
+    <tr>
+      <td>
+        <span class="top5-dot" style="background:${TOPHABS_COLORS[i]}"></span>
+        Hab. ${String(h.numero).padStart(3,'0')}
+        <span class="badge badge-gold" style="font-size:9px">${CATEGORIA_LABELS[h.cat]||h.cat||'—'}</span>
+      </td>
+      <td>${h.usos}</td>
+      <td><strong>S/. ${h.total.toFixed(2)}</strong></td>
+    </tr>`).join('');
+
+  // Leyenda
+  const legend = document.getElementById('tophabs-legend');
+  if(legend) legend.innerHTML = topH.map((h,i)=>`
+    <div class="top5-legend-item">
+      <span class="top5-dot" style="background:${TOPHABS_COLORS[i]}"></span>
+      <span class="top5-legend-name">Hab. ${String(h.numero).padStart(3,'0')} (${CATEGORIA_LABELS[h.cat]||h.cat||'—'})</span>
+      <span class="top5-legend-pct">${((h.usos/totalUsos)*100).toFixed(1)}%</span>
+    </div>`).join('');
+
+  // Donut reutilizando la misma lógica pero con canvas y tooltip distintos
+  dibujarDonutGenerico('tophabs-canvas', 'tophabs-tooltip', topH, TOPHABS_COLORS,
+    (h) => `Hab. ${String(h.numero).padStart(3,'0')}`,
+    (h) => `S/. ${h.total.toFixed(2)}`,
+    (h) => `${h.usos} uso${h.usos!==1?'s':''}`,
+    (h,tot) => h.usos/tot,
+    totalUsos,
+    totalUsos + ' usos'
+  );
+}
+
+// Versión genérica del donut para reutilizar con habitaciones y productos
+function dibujarDonutGenerico(canvasId, tooltipId, items, colors,
+    fnLabel, fnVal, fnSub, fnPct, total, centerText) {
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2;
+  const R = Math.min(W,H)/2 - 10;
+  const r = R * 0.52;
+
+  ctx.clearRect(0,0,W,H);
+
+  const segmentos = [];
+  let startAngle = -Math.PI/2;
+  items.forEach((item,i) => {
+    const pct = fnPct(item,total);
+    const endAngle = startAngle + pct*2*Math.PI;
+    segmentos.push({ item, i, startAngle, endAngle, pct });
+    startAngle = endAngle;
+  });
+
+  canvas._segmentos = segmentos;
+  canvas._R=R; canvas._r=r; canvas._cx=cx; canvas._cy=cy;
+  canvas._total=total; canvas._centerText=centerText;
+  canvas._colors=colors;
+
+  segmentos.forEach(seg => dibujarSegmentoGenerico(ctx, seg, R, r, cx, cy, false, colors));
+
+  // Texto central
+  ctx.fillStyle='#1e1b4b'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font='bold 12px Inter,Arial,sans-serif';
+  ctx.fillText(centerText, cx, cy-8);
+  ctx.font='10px Inter,Arial,sans-serif'; ctx.fillStyle='#6b7280';
+  ctx.fillText('total', cx, cy+10);
+
+  if(!canvas._hoverBound) {
+    canvas._hoverBound=true;
+    const tooltip = document.getElementById(tooltipId);
+
+    canvas.addEventListener('mousemove', function(e) {
+      const rect = canvas.getBoundingClientRect();
+      const mx=(e.clientX-rect.left)*(canvas.width/rect.width);
+      const my=(e.clientY-rect.top)*(canvas.height/rect.height);
+      const {_segmentos:segs,_R:Ro,_r:ri,_cx:ox,_cy:oy,_colors:cls} = canvas;
+      const dx=mx-ox, dy=my-oy, dist=Math.sqrt(dx*dx+dy*dy);
+
+      if(dist>=ri&&dist<=Ro) {
+        let ang=Math.atan2(dy,dx);
+        if(ang<-Math.PI/2) ang+=2*Math.PI;
+        const seg=segs.find(s=>ang>=s.startAngle&&ang<s.endAngle);
+        if(seg) {
+          ctx.clearRect(0,0,W,H);
+          segs.forEach(s=>dibujarSegmentoGenerico(ctx,s,Ro,ri,ox,oy,s===seg,cls));
+          ctx.fillStyle='#1e1b4b'; ctx.textAlign='center'; ctx.textBaseline='middle';
+          ctx.font='bold 11px Inter,Arial,sans-serif';
+          const lbl=fnLabel(seg.item); const shortLbl=lbl.length>14?lbl.substring(0,14)+'…':lbl;
+          ctx.fillText(fnVal(seg.item), ox, oy-8);
+          ctx.font='9px Inter,Arial,sans-serif'; ctx.fillStyle='#6b7280';
+          ctx.fillText(shortLbl, ox, oy+8);
+          if(tooltip) {
+            tooltip.style.display='block';
+            tooltip.innerHTML=`<strong>${fnLabel(seg.item)}</strong><br>${fnVal(seg.item)} &nbsp;|&nbsp; ${(seg.pct*100).toFixed(1)}%<br><small>${fnSub(seg.item)}</small>`;
+            const wrap=canvas.parentElement, wRect=wrap.getBoundingClientRect();
+            let tx=e.clientX-wRect.left+12, ty=e.clientY-wRect.top-10;
+            if(tx+170>wRect.width) tx=e.clientX-wRect.left-175;
+            tooltip.style.left=tx+'px'; tooltip.style.top=ty+'px';
+          }
+          return;
+        }
+      }
+      // Restaurar
+      ctx.clearRect(0,0,W,H);
+      segs.forEach(s=>dibujarSegmentoGenerico(ctx,s,Ro,ri,ox,oy,false,cls));
+      ctx.fillStyle='#1e1b4b'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.font='bold 12px Inter,Arial,sans-serif';
+      ctx.fillText(canvas._centerText,ox,oy-8);
+      ctx.font='10px Inter,Arial,sans-serif'; ctx.fillStyle='#6b7280';
+      ctx.fillText('total',ox,oy+10);
+      if(tooltip) tooltip.style.display='none';
+    });
+    canvas.addEventListener('mouseleave',function(){
+      const {_segmentos:segs,_R:Ro,_r:ri,_cx:ox,_cy:oy,_colors:cls}=canvas;
+      ctx.clearRect(0,0,W,H);
+      segs.forEach(s=>dibujarSegmentoGenerico(ctx,s,Ro,ri,ox,oy,false,cls));
+      ctx.fillStyle='#1e1b4b'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.font='bold 12px Inter,Arial,sans-serif';
+      ctx.fillText(canvas._centerText,ox,oy-8);
+      ctx.font='10px Inter,Arial,sans-serif'; ctx.fillStyle='#6b7280';
+      ctx.fillText('total',ox,oy+10);
+      const tooltip=document.getElementById(tooltipId);
+      if(tooltip) tooltip.style.display='none';
+    });
+  }
+}
+
+function dibujarSegmentoGenerico(ctx, seg, R, r, cx, cy, activo, colors) {
+  const gap=0.015, sa=seg.startAngle+gap, ea=seg.endAngle-gap;
+  ctx.save();
+  if(activo){ const m=(seg.startAngle+seg.endAngle)/2; ctx.translate(Math.cos(m)*6,Math.sin(m)*6); }
+  ctx.beginPath();
+  ctx.moveTo(cx+r*Math.cos(sa),cy+r*Math.sin(sa));
+  ctx.arc(cx,cy,activo?R*1.05:R,sa,ea);
+  ctx.arc(cx,cy,r,ea,sa,true);
+  ctx.closePath();
+  ctx.fillStyle=colors[seg.i]; ctx.fill();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
   ctx.restore();
 }

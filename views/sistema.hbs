@@ -480,6 +480,27 @@
             </div>
           </div>
 
+          <!-- Top habitaciones más usadas -->
+          <div class="sys-card" id="card-top-habs" style="display:none;margin-top:0">
+            <div class="sys-card-head">
+              <h3><i class="fas fa-bed" style="color:#7c3aed;margin-right:6px"></i>Top habitaciones más usadas</h3>
+              <span id="tophabs-periodo" class="rep-periodo-label"></span>
+            </div>
+            <div class="top5-layout">
+              <div class="top5-chart-wrap">
+                <canvas id="tophabs-canvas" width="260" height="260"></canvas>
+                <div id="tophabs-tooltip" class="top5-tooltip" style="display:none"></div>
+              </div>
+              <div class="top5-legend-wrap">
+                <div id="tophabs-legend" class="top5-legend"></div>
+                <table class="top5-table">
+                  <thead><tr><th>Habitación</th><th>Usos</th><th>Total S/.</th></tr></thead>
+                  <tbody id="tophabs-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
         </section>
 
         <!-- ═══ COMPROBANTES ═══ -->
@@ -921,6 +942,34 @@
       <button class="stock-alert-btn" onclick="irAlAlmacen()">
         Ver productos y abastecer <i class="fas fa-search"></i>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal resumen caja -->
+<div id="modal-caja-detalle" class="sys-modal" style="display:none">
+  <div class="sys-modal-box">
+    <div class="sys-modal-head" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
+      <h3 style="color:#fff"><i class="fas fa-cash-register" style="margin-right:8px"></i>Detalles caja <span id="mcd-titulo"></span></h3>
+      <button class="modal-close" data-modal="modal-caja-detalle" style="color:#fff">✕</button>
+    </div>
+    <div class="sys-modal-body">
+      <!-- Resumen tipo imagen de referencia -->
+      <div id="mcd-resumen" class="mcd-resumen"></div>
+      <!-- Movimientos -->
+      <div class="sys-card-head" style="margin-top:14px;padding:10px 0 6px">
+        <h3 style="font-size:13px"><i class="fas fa-list" style="color:var(--primary);margin-right:6px"></i>Movimientos detallados</h3>
+      </div>
+      <div class="table-wrap" style="max-height:220px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Hora</th><th>Concepto</th><th>Tipo</th><th>Monto</th></tr></thead>
+          <tbody id="mcd-movimientos"><tr><td colspan="4" class="empty-row">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="form-actions" style="margin-top:14px">
+        <button class="sys-btn sys-btn-outline" data-modal="modal-caja-detalle">Cerrar</button>
+        <button class="sys-btn sys-btn-gold" id="mcd-btn-ticket"><i class="fas fa-print"></i> Imprimir ticket</button>
+      </div>
     </div>
   </div>
 </div>
