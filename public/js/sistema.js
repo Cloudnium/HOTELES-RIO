@@ -440,6 +440,13 @@ function openCheckinModal(room) {
   const manana = mananaDate.toISOString().split('T')[0];
   document.getElementById('ci-entrada').value=today;
   document.getElementById('ci-salida').value=manana;
+  // Valores por defecto para clientes rápidos
+  const nombreEl = document.getElementById('ci-nombre');
+  const dniEl    = document.getElementById('ci-dni');
+  const telEl    = document.getElementById('ci-tel');
+  if(nombreEl && !nombreEl.value) nombreEl.value = 'CLIENTE GENERAL';
+  if(dniEl    && !dniEl.value)    dniEl.value    = '00000000';
+  if(telEl    && !telEl.value)    telEl.value    = '000000000';
   document.getElementById('btn-confirmar-checkin').onclick=()=>confirmarCheckin(room.id);
   openModal('modal-checkin');
 }
@@ -510,6 +517,20 @@ async function openCheckoutModal(room, checkin) {
         <span style="font-size:12px;color:var(--text-2)">ingresa 0 si no aplica</span>
       </div>
     </div>`:''}
+    <div class="co-extra-box">
+      <div class="co-extra-row">
+        <span style="color:#16a34a;font-weight:600">🏷️ Descuento (opcional, S/.)</span>
+        <input type="number" id="monto-descuento" class="sys-input" placeholder="0.00"
+          step="0.01" min="0" style="width:110px;text-align:right"
+          oninput="window._coRecalc()">
+      </div>
+      <div class="co-extra-row">
+        <span style="color:#dc2626;font-weight:600">⚠️ Multa por daños (opcional, S/.)</span>
+        <input type="number" id="monto-multa" class="sys-input" placeholder="0.00"
+          step="0.01" min="0" style="width:110px;text-align:right"
+          oninput="window._coRecalc()">
+      </div>
+    </div>
     <div class="checkout-row checkout-total">
       <span>TOTAL A COBRAR</span><span id="co-total-display">S/. ${totalBase.toFixed(2)}</span>
     </div>
@@ -535,8 +556,10 @@ async function openCheckoutModal(room, checkin) {
   window._coBase = totalBase;
   window._coMetodo = 'Efectivo';
   window._coRecalc = function() {
-    const san = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
-    const nv = window._coBase + san;
+    const san  = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
+    const desc = parseFloat(document.getElementById('monto-descuento')?.value||0)||0;
+    const mult = parseFloat(document.getElementById('monto-multa')?.value||0)||0;
+    const nv = Math.max(0, window._coBase + san - desc + mult);
     document.getElementById('co-total-display').textContent = `S/. ${nv.toFixed(2)}`;
     document.getElementById('efectivo-recibido').value = nv.toFixed(2);
     document.getElementById('vuelto-display').textContent = 'S/. 0.00';
@@ -586,7 +609,7 @@ async function continuarCheckoutConPen(){
   if(d) await confirmarCheckout(d.room,d.checkin,d.totalBase+pen,d.consumos,window._coMetodo||'Efectivo',0,d.totalHab,d.totalConsumos,pen);
 }
 
-async function confirmarCheckout(room, checkin, total, consumos, metodoPago, vuelto, totalHab, totalConsumos, penalizacion=0) {
+async function confirmarCheckout(room, checkin, total, consumos, metodoPago, vuelto, totalHab, totalConsumos, penalizacion=0, descuento=0, multa=0) {
   try {
     // 1. Cerrar modal PRIMERO para que el usuario vea que algo pasó
     closeModal('modal-checkout');
@@ -619,7 +642,7 @@ async function confirmarCheckout(room, checkin, total, consumos, metodoPago, vue
     const serie = await getSiguienteSerie('HAB');
     const datosTicket = {
       serie, room, checkin, consumos, total, metodoPago, vuelto,
-      totalHab, totalConsumos, penalizacion,
+      totalHab, totalConsumos, penalizacion, descuento, multa,
       cajero: currentUserProfile?.nombre||'—',
       fecha:  new Date().toISOString()
     };
@@ -709,7 +732,9 @@ function imprimirTicketHabitacion(d) {
     <div class="ln"></div>
     <table>
       <tr><td>Habitación (tarifa fija)</td><td class="r">S/.${d.totalHab.toFixed(2)}</td></tr>
-      ${(d.penalizacion||0)>0?`<tr><td>Sanción por tiempo extra</td><td class="r">S/.${(d.penalizacion||0).toFixed(2)}</td></tr>`:''}
+      ${(d.penalizacion||0)>0?`<tr><td>Sanción por tiempo extra</td><td class="r">+S/.${(d.penalizacion||0).toFixed(2)}</td></tr>`:''}
+      ${(d.descuento||0)>0?`<tr><td>Descuento aplicado</td><td class="r" style="color:#16a34a">-S/.${(d.descuento||0).toFixed(2)}</td></tr>`:''}
+      ${(d.multa||0)>0?`<tr><td>Multa por daños</td><td class="r" style="color:#dc2626">+S/.${(d.multa||0).toFixed(2)}</td></tr>`:''}
     </table>
     ${consumosHTML}
     <div class="ln"></div>
@@ -1174,6 +1199,7 @@ async function loadCajas(){
               ?`<button class="sys-btn sys-btn-outline sys-btn-sm" onclick="cerrarCaja(${c.id})">Cerrar caja</button>`:''}
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="abrirDetalleCaja(${c.id})">Ver detalle</button>
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="imprimirCaja(${c.id})">🖨 Ticket</button>
+            <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="descargarReporteCaja(${c.id})"><i class="fas fa-download"></i> Descargar</button>
           </div>
         </div>`).join('')
     :'<p style="color:var(--text-light)">No hay cajas en esta fecha.</p>';
@@ -1376,21 +1402,21 @@ async function generarReporte(){
   const lbl = document.getElementById('rep-periodo-label');
   if(lbl) lbl.textContent = `Período: ${formatDate(desde)} — ${formatDate(hasta)}`;
 
-  // ── Tabla: ingresos por habitación ──
+  // ── Tabla: ingresos por habitación (agrupado por CATEGORÍA) ──
   const groupHab = {};
   checkins.forEach(c=>{
-    const k = c.habitaciones?.numero || '?';
-    if(!groupHab[k]) groupHab[k]={ numero:k, cat:c.habitaciones?.categoria, usos:0, total:0 };
-    groupHab[k].usos++;
-    groupHab[k].total += c.total_cobrado||0;
+    const cat   = c.habitaciones?.categoria || 'otros';
+    const label = CATEGORIA_LABELS[cat] || cat;
+    if(!groupHab[cat]) groupHab[cat]={ cat, label, usos:0, total:0 };
+    groupHab[cat].usos++;
+    groupHab[cat].total += c.total_cobrado||0;
   });
   const tbHab = document.getElementById('reporte-habitaciones');
   if(tbHab) tbHab.innerHTML = Object.values(groupHab).length
     ? Object.values(groupHab).map(h=>`
         <tr>
           <td><i class="fas fa-bed" style="color:var(--primary);margin-right:6px"></i>
-            Hab. ${String(h.numero).padStart(3,'0')}
-            <span class="badge badge-gold">${CATEGORIA_LABELS[h.cat]||h.cat||'—'}</span>
+            <span class="badge badge-gold">${h.label}</span>
           </td>
           <td>${h.usos}</td>
           <td><strong>S/. ${h.total.toFixed(2)}</strong></td>
@@ -1507,6 +1533,7 @@ async function filtrarComprobantes(){
         <td style="white-space:nowrap">
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="reimprimirComp(${c.id})">🖨 Reimprimir</button>
             ${currentUserProfile?.rol==='admin'?`<button class="sys-btn sys-btn-outline sys-btn-sm" style="margin-left:4px" onclick="editarMetodoPago(${c.id})">✏️ Pago</button>`:''}
+            <button class="sys-btn sys-btn-red sys-btn-sm" style="margin-left:4px" onclick="eliminarComprobante(${c.id},'${c.tipo_serie}',${c.check_in_id||'null'},${c.total||0})">🗑 Anular</button>
           </td>
       </tr>`).join('')
     :'<tr><td colspan="7" class="empty-row">No hay comprobantes en este rango</td></tr>';
@@ -1870,6 +1897,60 @@ document.getElementById('btn-guardar-metodo')?.addEventListener('click',async()=
   closeModal('modal-editar-metodo');
   loadComprobantes();
 });
+
+
+async function eliminarComprobante(id, tipo, checkInId, totalComp) {
+  if(!confirm(`¿Anular este comprobante de S/. ${Number(totalComp).toFixed(2)}? Esta acción revertirá el registro y no se puede deshacer.`)) return;
+
+  try {
+    // 1. Obtener datos del comprobante
+    const { data:comp } = await sb.from('comprobantes').select('*').eq('id',id).single();
+    if(!comp){ showToast('Comprobante no encontrado','err'); return; }
+
+    // 2. Eliminar el comprobante
+    await sb.from('comprobantes').delete().eq('id',id);
+
+    // 3. Si es de habitación → revertir check_in
+    if(tipo==='HAB' && checkInId) {
+      await sb.from('check_ins').update({
+        check_out_real: null,
+        total_cobrado: 0,
+        metodo_pago: null,
+        serie_comprobante: null
+      }).eq('id', checkInId);
+      // Volver la habitación a disponible
+      const { data:ci } = await sb.from('check_ins').select('habitacion_id').eq('id',checkInId).single();
+      if(ci?.habitacion_id) {
+        await sb.from('habitaciones').update({estado:'disponible'}).eq('id',ci.habitacion_id);
+      }
+    }
+
+    // 4. Si hay movimiento de caja asociado → revertirlo (crear egreso compensatorio)
+    if(comp.caja_id) {
+      // Buscar el movimiento de ingreso relacionado
+      const { data:movs } = await sb.from('movimientos_caja')
+        .select('*').eq('caja_id', comp.caja_id)
+        .like('concepto', `%${tipo==='HAB'?'Check-out':'Venta'}%`)
+        .order('created_at',{ascending:false}).limit(20);
+
+      // Insertar movimiento de reversa
+      await sb.from('movimientos_caja').insert({
+        caja_id: comp.caja_id,
+        concepto: `ANULACIÓN ${tipo==='HAB'?'hospedaje':'venta'} — comprobante #${id}`,
+        tipo: 'egreso',
+        monto: comp.total||0,
+        usuario_id: currentUserProfile?.id,
+      });
+    }
+
+    showToast('Comprobante anulado ✓ — Los registros han sido revertidos','ok');
+    loadComprobantes();
+
+  } catch(err) {
+    console.error('Error al anular:', err);
+    showToast('Error al anular: ' + (err.message||'ver consola'), 'err');
+  }
+}
 
 // ══════════════════════════════════════════════════════════
 //  HABITACIONES: AGREGAR / EDITAR / ELIMINAR (solo admin)
@@ -2626,7 +2707,7 @@ function renderTopHabs(habitaciones, desde, hasta) {
     <tr>
       <td>
         <span class="top5-dot" style="background:${TOPHABS_COLORS[i]}"></span>
-        Hab. ${String(h.numero).padStart(3,'0')}
+        ${h.label||CATEGORIA_LABELS[h.cat]||h.cat||'—'}
         <span class="badge badge-gold" style="font-size:9px">${CATEGORIA_LABELS[h.cat]||h.cat||'—'}</span>
       </td>
       <td>${h.usos}</td>
@@ -2638,13 +2719,13 @@ function renderTopHabs(habitaciones, desde, hasta) {
   if(legend) legend.innerHTML = topH.map((h,i)=>`
     <div class="top5-legend-item">
       <span class="top5-dot" style="background:${TOPHABS_COLORS[i]}"></span>
-      <span class="top5-legend-name">Hab. ${String(h.numero).padStart(3,'0')} (${CATEGORIA_LABELS[h.cat]||h.cat||'—'})</span>
+      <span class="top5-legend-name">${h.label||CATEGORIA_LABELS[h.cat]||h.cat||'—'} (${CATEGORIA_LABELS[h.cat]||h.cat||'—'})</span>
       <span class="top5-legend-pct">${((h.usos/totalUsos)*100).toFixed(1)}%</span>
     </div>`).join('');
 
   // Donut reutilizando la misma lógica pero con canvas y tooltip distintos
   dibujarDonutGenerico('tophabs-canvas', 'tophabs-tooltip', topH, TOPHABS_COLORS,
-    (h) => `Hab. ${String(h.numero).padStart(3,'0')}`,
+    (h) => `${h.label||CATEGORIA_LABELS[h.cat]||h.cat||'—'}`,
     (h) => `S/. ${h.total.toFixed(2)}`,
     (h) => `${h.usos} uso${h.usos!==1?'s':''}`,
     (h,tot) => h.usos/tot,
@@ -2761,4 +2842,224 @@ function dibujarSegmentoGenerico(ctx, seg, R, r, cx, cy, activo, colors) {
   ctx.fillStyle=colors[seg.i]; ctx.fill();
   ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
   ctx.restore();
+}
+
+// ══════════════════════════════════════════════════════════
+//  DESCARGAR REPORTE CAJA — PDF estilo reporte profesional
+// ══════════════════════════════════════════════════════════
+async function descargarReporteCaja(cajaId) {
+  showToast('Generando reporte...','ok');
+
+  const [
+    {data:caja},
+    {data:compHAB},
+    {data:compPUB}
+  ] = await Promise.all([
+    sb.from('cajas').select('*, usuarios(nombre)').eq('id',cajaId).single(),
+    sb.from('comprobantes').select('metodo_pago,total,datos_json,check_in_id').eq('caja_id',cajaId).eq('tipo_serie','HAB').order('created_at'),
+    sb.from('comprobantes').select('metodo_pago,total,datos_json').eq('caja_id',cajaId).eq('tipo_serie','PUB').order('created_at'),
+  ]);
+
+  let totalEgresos = 0, egrRows = '';
+  try {
+    const {data:egr} = await sb.from('egresos').select('*').eq('fecha', caja?.fecha||fechaPeruHoy());
+    totalEgresos = (egr||[]).reduce((s,e)=>s+(e.monto||0),0);
+    egrRows = (egr||[]).map(e=>`<tr><td>${e.categoria||'—'}</td><td>${e.descripcion||'—'}</td><td>S/${(e.monto||0).toFixed(2)}</td><td>${e.metodo_pago||'—'}</td></tr>`).join('');
+  } catch(_){}
+
+  const usuario = caja?.usuarios?.nombre || '—';
+  const fmtDT = ts => ts ? new Date(ts).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}) : '—';
+  const horaAp = fmtDT(caja?.hora_apertura||caja?.created_at);
+  const horaCi = caja?.hora_cierre ? fmtDT(caja.hora_cierre) : '—';
+  const totalGeneral = caja?.total||0;
+
+  // Métodos de pago
+  const mMap = {Efectivo:0, Yape:0, Plin:0, Tarjeta:0};
+  (compHAB||[]).forEach(c=>{const m=c.metodo_pago||'Efectivo';mMap[m]=(mMap[m]||0)+(c.total||0);});
+  (compPUB||[]).forEach(c=>{const m=c.metodo_pago||'Efectivo';mMap[m]=(mMap[m]||0)+(c.total||0);});
+
+  // Detalle de hospedaje
+  let totalHosp = 0;
+  const hospeRows = (compHAB||[]).map(c=>{
+    try {
+      const d = typeof c.datos_json==='string' ? JSON.parse(c.datos_json) : c.datos_json;
+      const num = d?.room?.numero ? String(d.room.numero).padStart(3,'0') : '?';
+      const cat = (CATEGORIA_LABELS[d?.room?.categoria]||d?.room?.categoria||'—').toUpperCase();
+      const pen = d?.penalizacion||0;
+      const desc = d?.descuento||0;
+      const mult = d?.multa||0;
+      const fechaCo = d?.fecha ? new Date(d.fecha).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true}) : '—';
+      const totalFila = c.total||0;
+      totalHosp += totalFila;
+      const extras = [
+        pen>0  ? `+S/${pen.toFixed(2)} sanción` : '',
+        desc>0 ? `-S/${desc.toFixed(2)} descuento` : '',
+        mult>0 ? `+S/${mult.toFixed(2)} multa` : '',
+      ].filter(Boolean).join(', ');
+      return `<tr>
+        <td>${cat} ${num}</td>
+        <td>${usuario}</td>
+        <td>${d?.checkin?.dni_huesped||'—'}</td>
+        <td>S/${(d?.totalHab||0).toFixed(2)}${extras?`<br><small style="color:#6b7280">${extras}</small>`:''}
+        <td>S/${totalFila.toFixed(2)}</td>
+        <td style="color:${c.metodo_pago==='Efectivo'?'#16a34a':'#2563eb'}">${c.metodo_pago||'—'}</td>
+        <td>${fechaCo}</td>
+      </tr>`;
+    } catch(_){ return '<tr><td colspan="7">—</td></tr>'; }
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:#9ca3af;font-style:italic">Sin hospedaje registrado</td></tr>';
+
+  // Detalle servicios: consumos por habitación + tienda pública
+  let totalServ = 0;
+  let servicioRows = '';
+  for(const c of (compHAB||[])){
+    try{
+      const d = typeof c.datos_json==='string' ? JSON.parse(c.datos_json) : c.datos_json;
+      if(d?.consumos?.length){
+        const num = d?.room?.numero ? String(d.room.numero).padStart(3,'0') : '?';
+        const cat = (CATEGORIA_LABELS[d?.room?.categoria]||d?.room?.categoria||'—').toUpperCase();
+        d.consumos.forEach(con=>{
+          const sub = (con.precio_total||0);
+          totalServ += sub;
+          servicioRows += `<tr>
+            <td>${cat} ${num}</td><td>${usuario}</td>
+            <td>${con.productos?.nombre||'—'}</td>
+            <td>S/${(con.precio_unitario||0).toFixed(2)}</td>
+            <td style="text-align:center">${con.cantidad}</td>
+            <td>S/${sub.toFixed(2)}</td>
+            <td style="color:${c.metodo_pago==='Efectivo'?'#16a34a':'#2563eb'}">${c.metodo_pago||'—'}</td>
+          </tr>`;
+        });
+      }
+    }catch(_){}
+  }
+  for(const v of (compPUB||[])){
+    try{
+      const d = typeof v.datos_json==='string' ? JSON.parse(v.datos_json) : v.datos_json;
+      const items = d?.items || d?.lineas || d?.carrito || [];
+      if(Array.isArray(items) && items.length){
+        items.forEach(it=>{
+          const nombre = it?.nombre || it?.[1]?.nombre || '—';
+          const precio = Number(it?.precio||it?.[1]?.precio||0);
+          const cant   = Number(it?.cantidad||it?.[1]?.cantidad||1);
+          const sub = precio*cant;
+          totalServ += sub;
+          servicioRows += `<tr>
+            <td>Tienda Pública</td><td>${usuario}</td>
+            <td>${nombre}</td>
+            <td>S/${precio.toFixed(2)}</td>
+            <td style="text-align:center">${cant}</td>
+            <td>S/${sub.toFixed(2)}</td>
+            <td style="color:${v.metodo_pago==='Efectivo'?'#16a34a':'#2563eb'}">${v.metodo_pago||'—'}</td>
+          </tr>`;
+        });
+      } else {
+        // Fallback: mostrar la venta pública como un ítem
+        const sub = v.total||0;
+        totalServ += sub;
+        servicioRows += `<tr>
+          <td>Tienda Pública</td><td>${usuario}</td>
+          <td>Venta #${v.id||'—'}</td><td>—</td>
+          <td style="text-align:center">1</td>
+          <td>S/${sub.toFixed(2)}</td>
+          <td style="color:${v.metodo_pago==='Efectivo'?'#16a34a':'#2563eb'}">${v.metodo_pago||'—'}</td>
+        </tr>`;
+      }
+    }catch(_){}
+  }
+  if(!servicioRows) servicioRows = '<tr><td colspan="7" style="text-align:center;color:#9ca3af;font-style:italic">Sin servicios registrados</td></tr>';
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Reporte Caja — ${usuario} — ${caja?.fecha||''}</title>
+<style>
+@page{size:A4;margin:14mm 12mm}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#1f2937;background:#fff}
+.header{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #1f2937;padding-bottom:10px;margin-bottom:12px}
+.header-left h1{font-size:18px;font-weight:900;letter-spacing:.5px}
+.header-left .sub{font-size:11px;color:#6b7280;margin-top:2px}
+.header-right{text-align:right;font-size:10px;line-height:1.8}
+.info-block{margin-bottom:10px;font-size:11px;line-height:2}
+.info-block strong{display:inline-block;min-width:180px}
+.montos{margin:8px 0 12px;font-size:12px;font-weight:700}
+.section{font-size:11px;font-weight:800;margin:12px 0 5px;padding:4px 8px;background:#f3f4f6;border-left:3px solid #374151}
+.metodos-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:6px 0 10px}
+.mc{border:1px solid #d1d5db;border-radius:5px;padding:6px;text-align:center}
+.mc .lbl{font-size:8px;font-weight:700;color:#374151;padding-bottom:3px;margin-bottom:3px;border-bottom:1px solid #e5e7eb}
+.mc .val{font-size:13px;font-weight:900}
+table{width:100%;border-collapse:collapse;margin-bottom:4px}
+th{background:#374151;color:#fff;padding:5px 7px;font-size:9px;font-weight:700;text-align:left}
+td{padding:5px 7px;border:1px solid #e5e7eb;font-size:9px;vertical-align:top}
+tr:nth-child(even) td{background:#f9fafb}
+.total-row td{font-weight:700;background:#f3f4f6;font-size:10px}
+@media print{button{display:none!important}}
+</style></head><body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>HOTELES RIO</h1>
+    <div class="sub">Reporte de caja ${caja?.estado==='cerrada'?'cerrada':'(en proceso)'}</div>
+  </div>
+  <div class="header-right">
+    <strong>N°${cajaId}</strong><br>
+    ${new Date().toLocaleDateString('es-PE')}
+  </div>
+</div>
+
+<div class="info-block">
+  <strong>Fecha apertura:</strong> ${horaAp} &nbsp;&nbsp; <strong>Responsable apertura:</strong> ${usuario}<br>
+  ${caja?.hora_cierre?`<strong>Fecha cierre:</strong> ${horaCi} &nbsp;&nbsp; <strong>Responsable cierre:</strong> ${usuario}`:'<strong>Estado:</strong> Aún abierta'}
+</div>
+<div class="montos">
+  Apertura: S/0.00 &nbsp;&nbsp;&nbsp; Monto de cierre sin apertura: <span style="font-size:14px">S/${totalGeneral.toFixed(2)}</span>
+</div>
+
+<div class="section">Métodos de pago</div>
+<div class="metodos-grid">
+  <div class="mc"><div class="lbl">Efectivo(Efec)</div><div class="val">S/${mMap.Efectivo.toFixed(2)}</div></div>
+  <div class="mc"><div class="lbl">Yape</div><div class="val">S/${mMap.Yape.toFixed(2)}</div></div>
+  <div class="mc"><div class="lbl">Plin</div><div class="val">S/${mMap.Plin.toFixed(2)}</div></div>
+  <div class="mc"><div class="lbl">Tarjeta(Tarj)</div><div class="val">S/${mMap.Tarjeta.toFixed(2)}</div></div>
+  <div class="mc"><div class="lbl" style="color:#dc2626">Egresos(-)</div><div class="val" style="color:#dc2626">S/${totalEgresos.toFixed(2)}</div></div>
+</div>
+
+<div class="section">Detalle de hospedaje</div>
+<table>
+  <thead><tr><th>Habitación</th><th>Responsable</th><th>Identificador</th><th>Total hospedaje</th><th>Total en caja</th><th>Método de pago</th><th>Fecha check-out</th></tr></thead>
+  <tbody>${hospeRows}</tbody>
+  <tr class="total-row">
+    <td colspan="3">Total:</td>
+    <td colspan="4">S/${totalHosp.toFixed(2)} &nbsp;&nbsp; Total sin crédito/cortesía: S/${totalHosp.toFixed(2)}</td>
+  </tr>
+</table>
+
+<div class="section">Detalle servicio a la habitación y ventas directas</div>
+<table>
+  <thead><tr><th>Habitación</th><th>Responsable</th><th>Artículo</th><th>Prec. Uni</th><th>Cant</th><th>Registrado en caja</th><th>Método de pago</th></tr></thead>
+  <tbody>${servicioRows}</tbody>
+  <tr class="total-row">
+    <td colspan="5">Total:</td>
+    <td colspan="2">S/${totalServ.toFixed(2)} &nbsp;&nbsp; Total sin crédito/cortesía: S/${totalServ.toFixed(2)}</td>
+  </tr>
+</table>
+
+${egrRows?`
+<div class="section">Detalle egresos</div>
+<table>
+  <thead><tr><th>Categoría</th><th>Descripción</th><th>Monto</th><th>Método</th></tr></thead>
+  <tbody>${egrRows}</tbody>
+  <tr class="total-row"><td colspan="2">Total egresos:</td><td colspan="2">S/${totalEgresos.toFixed(2)} (-)</td></tr>
+</table>`:''}
+
+<div style="text-align:center;margin-top:16px">
+  <button onclick="window.print()" style="padding:10px 28px;font-size:14px;cursor:pointer;background:#374151;color:#fff;border:none;border-radius:6px;font-family:sans-serif;font-weight:700">
+    🖨 Imprimir / Guardar PDF
+  </button>
+</div>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=950,height=720');
+  if(!win){ showToast('Permite ventanas emergentes para descargar','err'); return; }
+  win.document.write(html);
+  win.document.close();
+  setTimeout(()=>win.focus(), 300);
 }
