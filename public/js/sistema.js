@@ -1605,12 +1605,35 @@ function setupModalUsuario(){
     if(id){await sb.from('usuarios').update({nombre,rol}).eq('id',id);showToast('Usuario actualizado ✓','ok');}
     else{
       if(!password||password.length<6){showToast('Contraseña mínimo 6 caracteres','err');return;}
-      btn.disabled=true;btn.textContent='Creando...';
-      let authId=null;
-      try{const resp=await fetch(`${SUPABASE_URL}/auth/v1/admin/users`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':`Bearer ${(await sb.auth.getSession()).data.session?.access_token}`},body:JSON.stringify({email,password,user_metadata:{nombre,rol},email_confirm:true})});const j=await resp.json();authId=j.id;}catch(e){}
-      if(authId){await sb.from('usuarios').upsert({auth_id:authId,nombre,email,rol,activo:true},{onConflict:'email'});showToast('✅ Usuario creado','ok');}
-      else{await sb.from('usuarios').upsert({nombre,email,rol,activo:true},{onConflict:'email'});showToast('⚠️ Perfil creado. Crea también el usuario en Supabase → Authentication → Add user.','ok');}
-      btn.disabled=false;btn.textContent='Guardar usuario';
+      btn.disabled=true; btn.textContent='Creando...';
+try {
+  const { data:authData, error:authErr } = await sb.auth.signUp({
+    email,
+    password,
+    options: { data: { nombre, rol } }
+  });
+
+  if(authErr) throw new Error(authErr.message);
+
+  const authId = authData?.user?.id;
+  if(!authId) throw new Error('No se obtuvo el ID de autenticación');
+
+  await sb.from('usuarios').upsert(
+    { auth_id: authId, nombre, email, rol, activo: true },
+    { onConflict: 'email' }
+  );
+
+  showToast('✅ Usuario creado — ya puede iniciar sesión','ok');
+
+} catch(err) {
+  console.error('Error creando usuario:', err);
+  if(err.message?.toLowerCase().includes('already registered')) {
+    showToast('⚠️ Ese email ya tiene cuenta. Usa Editar rol para modificarlo.','err');
+  } else {
+    showToast('Error: ' + (err.message||'ver consola'), 'err');
+  }
+}
+btn.disabled=false; btn.textContent='Guardar usuario';
     }
     closeModal('modal-usuario');loadUsuarios();
   });
