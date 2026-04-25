@@ -586,10 +586,12 @@ async function openCheckoutModal(room, checkin) {
   document.getElementById('btn-confirmar-checkout').onclick = async() => {
     const metP = window._coMetodo || 'Efectivo';
     const san  = parseFloat(document.getElementById('monto-sancion')?.value||0)||0;
-    const tot  = window._coBase + san;
+    const desc = parseFloat(document.getElementById('monto-descuento')?.value||0)||0;
+    const mult = parseFloat(document.getElementById('monto-multa')?.value||0)||0;
+    const tot  = Math.max(0, window._coBase + san - desc + mult);
     const rec  = parseFloat(document.getElementById('efectivo-recibido')?.value)||tot;
     const vuel = metP==='Efectivo' ? Math.max(0,rec-tot) : 0;
-    await confirmarCheckout(room, checkin, tot, consumos, metP, vuel, totalHab, totalConsumos, san);
+    await confirmarCheckout(room, checkin, tot, consumos, metP, vuel, totalHab, totalConsumos, san, desc, mult);
   };
 
   openModal('modal-checkout');
@@ -1533,7 +1535,7 @@ async function filtrarComprobantes(){
         <td style="white-space:nowrap">
             <button class="sys-btn sys-btn-outline sys-btn-sm" onclick="reimprimirComp(${c.id})">🖨 Reimprimir</button>
             ${currentUserProfile?.rol==='admin'?`<button class="sys-btn sys-btn-outline sys-btn-sm" style="margin-left:4px" onclick="editarMetodoPago(${c.id})">✏️ Pago</button>`:''}
-            <button class="sys-btn sys-btn-red sys-btn-sm" style="margin-left:4px" onclick="eliminarComprobante(${c.id},'${c.tipo_serie}',${c.check_in_id||'null'},${c.total||0})">🗑 Anular</button>
+            ${currentUserProfile?.rol==='admin'?`<button class="sys-btn sys-btn-red sys-btn-sm" style="margin-left:4px" onclick="eliminarComprobante(${c.id},'${c.tipo_serie}',${c.check_in_id||'null'},${c.total||0})">🗑 Anular</button>`:''}
           </td>
       </tr>`).join('')
     :'<tr><td colspan="7" class="empty-row">No hay comprobantes en este rango</td></tr>';
